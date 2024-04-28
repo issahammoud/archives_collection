@@ -1,5 +1,5 @@
 import logging
-
+from bs4 import BeautifulSoup
 from src.helpers.enum import Archives, DBCOLUMNS
 from src.data_processing.data_collector import DataCollector
 
@@ -18,7 +18,7 @@ class LeMondeCollector(DataCollector):
 
     def parse_single_section(self, section):
         figure_url = section.figure.picture.source.get("data-srcset")
-        image = self.read_image(figure_url)
+        image = self.get_url_content(figure_url)
         title = section.a.h3.text.strip()
         content = section.a.p.text.strip()
         tag = section.a.span.text.strip()
@@ -47,7 +47,7 @@ class LeFigaroCollector(DataCollector):
 
     def parse_single_section(self, section):
         figure_url = section.img.get("srcset").split()[-2]
-        image = self.read_image(figure_url)
+        image = self.get_url_content(figure_url)
         title = section.h2.text.strip()
         content = section.div.text.strip()
         tag = section.ul.select("li")[-1].text.strip()
@@ -74,7 +74,7 @@ class LesEchosCollector(DataCollector):
 
     def parse_single_section(self, section):
         figure_url = section.a.picture.select("source")[-1].get("srcset")
-        image = self.read_image(figure_url)
+        image = self.get_url_content(figure_url)
         title = section.h3.text.strip()
         content = section.select("a")[1].select("div")[-1].text.strip()
         tag = None
@@ -86,6 +86,38 @@ class LesEchosCollector(DataCollector):
             DBCOLUMNS.content: content,
             DBCOLUMNS.tag: tag,
             DBCOLUMNS.link: self.url_format.format(section_url),
+            DBCOLUMNS.archive: self.archive,
+        }
+        return data
+
+
+class VingthMinutesCollector(DataCollector):
+    def __init__(self, begin_date, end_date, timeout):
+        url_format = "https://www.20minutes.fr/archives/{}"
+        self._base_url = "https://www.20minutes.fr"
+        date_format = "%Y/%m-%d"
+        self.archive = Archives.vinghtminutes
+        self.content_selector = "section > div > ul > li"
+        super().__init__(url_format, date_format, begin_date, end_date, timeout)
+
+    def parse_single_section(self, section):
+        section_url = self._base_url + section.a.get("href")
+        url_content = self.get_url_content(section_url)
+        section_content = BeautifulSoup(url_content, "html.parser")
+
+        figure_url = section_content.figure.img.get("src")
+        image = self.get_url_content(figure_url)
+        title = section_content.h1.text.strip()
+
+        content = section_content.select("header > div > span")[-1].text.strip()
+        tag = section_content.select("header > div > span")[0].text.strip()
+
+        data = {
+            DBCOLUMNS.image: image,
+            DBCOLUMNS.title: title,
+            DBCOLUMNS.content: content,
+            DBCOLUMNS.tag: tag,
+            DBCOLUMNS.link: section_url,
             DBCOLUMNS.archive: self.archive,
         }
         return data

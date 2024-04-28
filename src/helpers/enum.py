@@ -5,6 +5,7 @@ class Archives(str, Enum):
     lemonde = "lemonde"
     lefigaro = "lefigaro"
     lesechos = "lesechos"
+    vinghtminutes = "vinghtminutes"
 
 
 class DBCOLUMNS(str, Enum):

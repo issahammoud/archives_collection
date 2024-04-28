@@ -48,8 +48,12 @@ class DataCollector(ABC):
         logger.info(f"{archive}: There are {len(remaining_dates)} pages to collect.")
 
         all_urls = [self.url_format.format(date) for date in remaining_dates]
-        assert len(all_urls) > 0, "No pages to collect"
         return all_urls
+
+    def get_url_content(self, url):
+        req = self.opener.open(url, timeout=self.timeout)
+        assert req.getcode() == 200, f"URL {url} not found, error code {req.getcode()}"
+        return req.read()
 
     def parse_single_page(self, url, content_selector):
         pattern = self.url_format.format("(.*)").replace("?", "\?")
@@ -58,12 +62,8 @@ class DataCollector(ABC):
         date = datetime.strptime(date, self.date_format)
 
         try:
-            req = self.opener.open(url, timeout=self.timeout)
-            assert (
-                req.getcode() == 200
-            ), f"Page {url} not found, error code {req.getcode()}"
-
-            parsed_content = BeautifulSoup(req.read(), "html.parser")
+            content = self.get_url_content(url)
+            parsed_content = BeautifulSoup(content, "html.parser")
             sections = parsed_content.select(content_selector)
             logger.debug(f"Page {url} contains {len(sections)} sections")
 
@@ -86,11 +86,3 @@ class DataCollector(ABC):
     @abstractmethod
     def parse_single_section(self, section):
         raise NotImplementedError
-
-    def read_image(self, figure_url):
-        if figure_url:
-            req = self.opener.open(figure_url, timeout=self.timeout)
-            assert (
-                req.getcode() == 200
-            ), f"Image {figure_url} not found, error code {req.getcode()}"
-            return req.read()

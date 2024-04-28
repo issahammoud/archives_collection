@@ -13,6 +13,7 @@ from src.data_processing.collectors import (
     LeMondeCollector,
     LeFigaroCollector,
     LesEchosCollector,
+    VingthMinutesCollector,
 )
 
 
@@ -25,6 +26,7 @@ class CollectorFactory:
         Archives.lemonde: LeMondeCollector,
         Archives.lefigaro: LeFigaroCollector,
         Archives.lesechos: LesEchosCollector,
+        Archives.vinghtminutes: VingthMinutesCollector,
     }
 
     def __init__(self, collectors_names, workers, **kwargs) -> None:
@@ -47,7 +49,9 @@ class CollectorFactory:
         for collector in self.collectors:
             all_urls.append(collector.get_all_url(collector.archive))
 
-        return alternate_elements(all_urls)
+        all_urls = alternate_elements(all_urls)
+        assert len(all_urls) > 0, "No pages to collect"
+        return all_urls
 
     def parse_single_page(self, url):
         for collector in self.collectors:
@@ -61,9 +65,7 @@ class CollectorFactory:
 
         count_before = {}
         for name in self.collectors_names:
-            count_before[name] = len(
-                DBConnector.get_count(engine, DBConnector.TABLE, name)
-            )
+            count_before[name] = DBConnector.get_count(engine, DBConnector.TABLE, name)
 
         logger.info(f"Getting the data for {len(urls)} dates")
         start = time.time()
