@@ -4,6 +4,7 @@ from enum import Enum
 class Archives(str, Enum):
     lemonde = "lemonde"
     lefigaro = "lefigaro"
+    lesechos = "lesechos"
 
 
 class DBCOLUMNS(str, Enum):

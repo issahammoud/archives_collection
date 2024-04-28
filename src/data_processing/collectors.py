@@ -61,3 +61,31 @@ class LeFigaroCollector(DataCollector):
             DBCOLUMNS.archive: self.archive,
         }
         return data
+
+
+class LesEchosCollector(DataCollector):
+    def __init__(self, begin_date, end_date, timeout):
+        url_format = "https://www.lesechos.fr/{}"
+        date_format = "%Y/%m"
+        self.archive = Archives.lesechos
+        self.content_selector = "div > article"
+
+        super().__init__(url_format, date_format, begin_date, end_date, timeout)
+
+    def parse_single_section(self, section):
+        figure_url = section.a.picture.select("source")[-1].get("srcset")
+        image = self.read_image(figure_url)
+        title = section.h3.text.strip()
+        content = section.select("a")[1].select("div")[-1].text.strip()
+        tag = None
+        section_url = section.a.get("href").strip()
+        section_url = section_url[1:] if section_url[0] == "/" else section_url
+        data = {
+            DBCOLUMNS.image: image,
+            DBCOLUMNS.title: title,
+            DBCOLUMNS.content: content,
+            DBCOLUMNS.tag: tag,
+            DBCOLUMNS.link: self.url_format.format(section_url),
+            DBCOLUMNS.archive: self.archive,
+        }
+        return data

@@ -18,12 +18,16 @@ class DataCollector(ABC):
         super().__init__()
         self.url_format = url_format
         self.date_format = date_format
-        self.begin_date = begin_date
-        self.end_date = (
-            end_date if end_date else datetime.strftime(datetime.now(), date_format)
-        )
+        self.begin_date = self._convert_date_to_format(begin_date)
+        self.end_date = self._convert_date_to_format(end_date)
         self.timeout = timeout
         self.opener = urllib.request.build_opener()
+
+    def _convert_date_to_format(self, str_date):
+        if str_date is not None:
+            date = datetime.strptime(str_date, "%d-%m-%Y")
+            return datetime.strftime(date, self.date_format)
+        return datetime.strftime(datetime.now(), self.date_format)
 
     def get_all_url(self, archive):
         begin_date = datetime.strptime(self.begin_date, self.date_format)

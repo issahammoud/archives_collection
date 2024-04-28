@@ -9,7 +9,11 @@ from src.helpers.enum import Archives
 from src.helpers.db_connector import DBConnector
 
 from src.utils.utils import alternate_elements
-from src.data_processing.collectors import LeMondeCollector, LeFigaroCollector
+from src.data_processing.collectors import (
+    LeMondeCollector,
+    LeFigaroCollector,
+    LesEchosCollector,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -17,7 +21,11 @@ engine = DBConnector.get_engine(DBConnector.DBNAME)
 
 
 class CollectorFactory:
-    MAPPING = {Archives.lemonde: LeMondeCollector, Archives.lefigaro: LeFigaroCollector}
+    MAPPING = {
+        Archives.lemonde: LeMondeCollector,
+        Archives.lefigaro: LeFigaroCollector,
+        Archives.lesechos: LesEchosCollector,
+    }
 
     def __init__(self, collectors_names, workers, **kwargs) -> None:
         self.collectors = []
@@ -51,6 +59,12 @@ class CollectorFactory:
         DBConnector.create_table(engine, DBConnector.TABLE)
         urls = self.get_all_url()
 
+        count_before = {}
+        for name in self.collectors_names:
+            count_before[name] = len(
+                DBConnector.get_count(engine, DBConnector.TABLE, name)
+            )
+
         logger.info(f"Getting the data for {len(urls)} dates")
         start = time.time()
 
@@ -64,13 +78,10 @@ class CollectorFactory:
         end = np.round((time.time() - start) / 60, 2)
 
         for name in self.collectors_names:
-            count_done = len(
-                DBConnector.get_done_dates(engine, DBConnector.TABLE, name)
-            )
             rows_nb = DBConnector.get_count(engine, DBConnector.TABLE, name)
-
+            diff = rows_nb - count_before[name]
             logger.info(
                 f"\nFor {name}:\n"
-                f"{count_done} pages were collected in {end} min. "
-                f"Among them, we found {rows_nb} sections"
+                f"{diff} sections were collected in {end} min. "
+                f"We have in total {rows_nb} sections."
             )

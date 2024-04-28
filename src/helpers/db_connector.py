@@ -77,6 +77,18 @@ class DBConnector:
         return rows
 
     @staticmethod
+    def get_archive_rows(engine, table, archive, columns=None):
+        columns = ", ".join(columns) if columns else "*"
+        with engine.connect() as connection:
+            result = connection.execute(
+                text(f"SELECT {columns} FROM {table} WHERE archive = :arx"),
+                {"arx": archive},
+            )
+            rows = result.fetchall()
+
+        return rows
+
+    @staticmethod
     def insert_row(engine, table, kwargs):
         with engine.connect() as connection:
             keys = list(kwargs.keys())
