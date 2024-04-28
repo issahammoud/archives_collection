@@ -7,6 +7,7 @@ from dash import Input, State, Output, callback, dcc
 
 
 from src.helpers.layout import Layout
+from src.helpers.enum import DBCOLUMNS
 from src.helpers.db_connector import DBConnector
 
 
@@ -19,14 +20,34 @@ engine = DBConnector.get_engine(DBConnector.DBNAME)
 )
 def change_page(page):
     if page:
-        args = DBConnector.get_row(engine, DBConnector.TABLE, page)
-        max_page = DBConnector.get_rows_count(engine, DBConnector.TABLE)
+        args = DBConnector.get_row(
+            engine,
+            DBConnector.TABLE,
+            page,
+            columns=[
+                DBCOLUMNS.image,
+                DBCOLUMNS.title,
+                DBCOLUMNS.content,
+                DBCOLUMNS.tag,
+            ],
+        )
+        max_page = DBConnector.get_total_rows_count(engine, DBConnector.TABLE)
 
         while args is None and page < max_page:
             page += 1
-            args = DBConnector.get_row(engine, DBConnector.TABLE, page)
+            args = DBConnector.get_row(
+                engine,
+                DBConnector.TABLE,
+                page,
+                columns=[
+                    DBCOLUMNS.image,
+                    DBCOLUMNS.title,
+                    DBCOLUMNS.content,
+                    DBCOLUMNS.tag,
+                ],
+            )
 
-        _, date, img, title, content, tag = args
+        img, title, content, tag = args
 
         src = base64.b64encode(img)
         src = "data:image/png;base64,{}".format(src.decode())
@@ -57,8 +78,16 @@ def go_to_page(clicks, page):
 )
 def download(n_clicks, page):
     if n_clicks and page:
-        _, date, img, title, content, tag = DBConnector.get_row(
-            engine, DBConnector.TABLE, page
+        img, title, content, tag = DBConnector.get_row(
+            engine,
+            DBConnector.TABLE,
+            page,
+            columns=[
+                DBCOLUMNS.image,
+                DBCOLUMNS.title,
+                DBCOLUMNS.content,
+                DBCOLUMNS.tag,
+            ],
         )
         text = "\n".join([title, content, tag])
 
