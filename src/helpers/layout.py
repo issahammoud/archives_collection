@@ -186,7 +186,7 @@ class Layout:
     @staticmethod
     def get_layout():
         page = 1
-        max_page = DBConnector.get_rows_count(engine, DBConnector.TABLE)
+        max_page = DBConnector.get_total_rows_count(engine, DBConnector.TABLE)
         pagination = Layout.get_pagination(page, max_page)
 
         return dmc.Container(

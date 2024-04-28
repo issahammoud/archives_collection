@@ -10,6 +10,8 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
 )
 
+from src.helpers.enum import DBCOLUMNS
+
 
 class DBConnector:
     DBNAME = "postgresql://issahammoud:allahma123@localhost:5432/lemonde"
@@ -32,13 +34,15 @@ class DBConnector:
             Table(
                 table,
                 metadata,
-                Column("rowid", Integer, nullable=False, autoincrement=True),
-                Column("date", DateTime, nullable=False),
-                Column("image", LargeBinary, nullable=True),
-                Column("title", String, nullable=True),
-                Column("content", String, nullable=True),
-                Column("tag", String, nullable=True),
-                PrimaryKeyConstraint("rowid"),
+                Column(DBCOLUMNS.rowid, Integer, nullable=False, autoincrement=True),
+                Column(DBCOLUMNS.date, DateTime, nullable=False),
+                Column(DBCOLUMNS.archive, String, nullable=False),
+                Column(DBCOLUMNS.image, LargeBinary, nullable=True),
+                Column(DBCOLUMNS.title, String, nullable=True),
+                Column(DBCOLUMNS.content, String, nullable=True),
+                Column(DBCOLUMNS.tag, String, nullable=True),
+                Column(DBCOLUMNS.link, String, nullable=True, unique=True),
+                PrimaryKeyConstraint(DBCOLUMNS.rowid),
             )
 
             metadata.create_all(engine)
@@ -54,7 +58,7 @@ class DBConnector:
         columns = ", ".join(columns) if columns else "*"
         with engine.connect() as connection:
             result = connection.execute(
-                text(f"SELECT {columns} FROM {table} " "WHERE rowid = :id"),
+                text(f"SELECT {columns} FROM {table} WHERE {DBCOLUMNS.rowid} = :id"),
                 {"id": id},
             )
             row = result.fetchone()
@@ -75,7 +79,6 @@ class DBConnector:
     @staticmethod
     def insert_row(engine, table, kwargs):
         with engine.connect() as connection:
-
             keys = list(kwargs.keys())
             placeholders = [":" + key for key in keys]
 
@@ -89,14 +92,31 @@ class DBConnector:
             connection.commit()
 
     @staticmethod
-    def get_done_dates(engine, table):
+    def get_done_dates(engine, table, archive):
         with engine.connect() as connection:
-            result = connection.execute(text(f"SELECT DISTINCT date FROM {table}"))
+            result = connection.execute(
+                text(
+                    f"SELECT DISTINCT date FROM {table} WHERE {DBCOLUMNS.archive}=:arx"
+                ),
+                {"arx": archive},
+            )
             dates = result.fetchall()
         return dates
 
     @staticmethod
-    def get_rows_count(engine, table):
+    def get_count(engine, table, archive):
+        with engine.connect() as connection:
+            result = connection.execute(
+                text(
+                    f"SELECT COUNT(*) FROM {table} WHERE {DBCOLUMNS.archive}=:archive"
+                ),
+                {"archive": archive},
+            )
+            dates = result.fetchone()[0]
+        return dates
+
+    @staticmethod
+    def get_total_rows_count(engine, table):
         with engine.connect() as connection:
             result = connection.execute(text(f"SELECT COUNT(*) FROM {table}"))
             dates = result.fetchone()[0]
