@@ -18,7 +18,6 @@ class Graph:
             xaxis=dict(
                 autorange=True,
                 showgrid=True,
-                # ticks='',
                 showticklabels=True,
                 visible=True,
             ),
@@ -84,7 +83,6 @@ class Layout:
                         dmc.DateRangePicker(
                             id="date",
                             allowSingleDateInRange=False,
-                            clearable=True,
                             value=DBConnector.get_min_max_dates(
                                 engine, DBConnector.TABLE
                             ),
@@ -107,17 +105,19 @@ class Layout:
 
     @staticmethod
     def get_pagination(active_page, max, df):
+        if max <= 0:
+            return html.Div(id="pagination")
         pagination = dmc.Grid(
             [
                 dmc.Col(
                     dmc.Pagination(
                         id="pagination",
                         total=int(np.round(max / 3)),
-                        withEdges=True,
+                        withEdges=False,
                         withControls=True,
                         size="lg",
                         page=active_page,
-                        siblings=0,
+                        siblings=1,
                     ),
                     span=6,
                 ),
@@ -164,7 +164,7 @@ class Layout:
         return pagination
 
     @staticmethod
-    def get_card(byte_img, title, content, tag, archive, date):
+    def get_card(byte_img, title, content, tag, archive, date, link):
         src = "data:image/png;base64,{}".format(base64.b64encode(byte_img).decode())
         date = datetime.strftime(date, "%B, %d %Y")
         archive = archive.strip().title() if archive else archive
@@ -203,7 +203,9 @@ class Layout:
             radius="md",
             style={"height": "100%"},
         )
-        return card
+        return html.A(
+            children=card, href=link, target="_blank", style={"textDecoration": "none"}
+        )
 
     @staticmethod
     def get_main_section(args):

@@ -79,11 +79,11 @@ class DBConnector:
 
         condition = ""
         if tag and tag != "All":
-            condition = "AND TRIM(UPPER(tag)) = :tag_1"
+            condition = "AND TRIM(UPPER(tag)) = :tag_1 "
             data.update({"tag_1": tag.strip().upper()})
 
         if query:
-            query = query = " | ".join(query.split())
+            query = query = " & ".join(query.split())
             condition += f"AND {DBCOLUMNS.text_searchable} @@ to_tsquery(:query)"
             data.update({"query": query})
 

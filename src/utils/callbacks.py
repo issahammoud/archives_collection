@@ -35,19 +35,16 @@ def create_content(tag, date_range, n_clicks, query):
         page = 1
         df = pd.DataFrame(DBConnector.group_by_month(engine, DBConnector.TABLE_VIEW))
         max_page = DBConnector.get_total_rows_count(engine, DBConnector.TABLE_VIEW)
-        if max_page == 0:
-            return html.Div(id="pagination")
         pagination = Layout.get_pagination(page, max_page, df)
         return pagination
     return html.Div(id="pagination")
 
 
 @callback(
-    Output("main", "children", allow_duplicate=True),
-    Input("pagination", "page"),
-    prevent_initial_call=True,
+    Output("main", "children"),
+    [Input("pagination", "page"), Input("left_side", "children")],
 )
-def change_page(page):
+def change_page(page, _):
     if page:
         page = min(
             page,
@@ -69,6 +66,7 @@ def change_page(page):
                 DBCOLUMNS.tag,
                 DBCOLUMNS.archive,
                 DBCOLUMNS.date,
+                DBCOLUMNS.link,
             ],
         )
         if args:
@@ -80,7 +78,6 @@ def change_page(page):
     Output("pagination", "page"),
     Input("go_to_page", "n_clicks"),
     State("page_id", "value"),
-    prevent_initial_call=True,
 )
 def go_to_page(clicks, page):
     if clicks:

@@ -1,6 +1,6 @@
 {
 "archives": ["lemonde", "lefigaro", "lesechos", "vinghtminutes"],
-"begin_date": "01-01-2010",
-"end_date": null,
+"begin_date": "01-01-2000",
+"end_date": "01-01-2010",
 "workers": 4,
 "timeout": 5}
