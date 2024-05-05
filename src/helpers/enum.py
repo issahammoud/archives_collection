@@ -17,3 +17,4 @@ class DBCOLUMNS(str, Enum):
     content = "content"
     tag = "tag"
     link = "link"
+    text_searchable = "text_searchable"

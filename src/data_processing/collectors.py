@@ -21,7 +21,7 @@ class LeMondeCollector(DataCollector):
         image = self.get_url_content(figure_url)
         title = section.a.h3.text.strip()
         content = section.a.p.text.strip()
-        tag = section.a.span.text.strip()
+        tag = section.a.span.text.strip().title()
         section_url = section.a.get("href")
         data = {
             DBCOLUMNS.image: image,
