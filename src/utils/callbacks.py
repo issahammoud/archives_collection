@@ -1,9 +1,6 @@
-import io
-import base64
-import zipfile
-import tempfile
+import pandas as pd
 from dash.exceptions import PreventUpdate
-from dash import Input, State, Output, callback, dcc
+from dash import Input, State, Output, callback, html
 
 
 from src.helpers.layout import Layout
@@ -15,91 +12,77 @@ engine = DBConnector.get_engine(DBConnector.DBNAME)
 
 
 @callback(
-    Output("main", "children"),
+    Output("left_side", "children"),
+    [
+        Input("tag", "value"),
+        Input("date", "value"),
+        Input("filter_by_text", "n_clicks"),
+    ],
+    State("query", "value"),
+)
+def create_content(tag, date_range, n_clicks, query):
+    if tag or date_range or n_clicks:
+        min_max_date = DBConnector.get_min_max_dates(engine, DBConnector.TABLE)
+
+        if tag != "All" or min_max_date != date_range or n_clicks:
+            DBConnector.create_view(
+                engine, DBConnector.TABLE, DBConnector.VIEW, tag, date_range, query
+            )
+            DBConnector.TABLE_VIEW = DBConnector.VIEW
+        else:
+            DBConnector.TABLE_VIEW = DBConnector.TABLE
+
+        page = 1
+        df = pd.DataFrame(DBConnector.group_by_month(engine, DBConnector.TABLE_VIEW))
+        max_page = DBConnector.get_total_rows_count(engine, DBConnector.TABLE_VIEW)
+        if max_page == 0:
+            return html.Div(id="pagination")
+        pagination = Layout.get_pagination(page, max_page, df)
+        return pagination
+    return html.Div(id="pagination")
+
+
+@callback(
+    Output("main", "children", allow_duplicate=True),
     Input("pagination", "page"),
+    prevent_initial_call=True,
 )
 def change_page(page):
     if page:
-        args = DBConnector.get_row(
-            engine,
-            DBConnector.TABLE,
+        page = min(
             page,
+            int(
+                round(
+                    DBConnector.get_total_rows_count(engine, DBConnector.TABLE_VIEW) / 3
+                )
+            ),
+        )
+        page_border = (3 * page - 2, 3 * page)
+        args = DBConnector.get_n_rows(
+            engine,
+            DBConnector.TABLE_VIEW,
+            page_border,
             columns=[
                 DBCOLUMNS.image,
                 DBCOLUMNS.title,
                 DBCOLUMNS.content,
                 DBCOLUMNS.tag,
+                DBCOLUMNS.archive,
+                DBCOLUMNS.date,
             ],
         )
-        max_page = DBConnector.get_total_rows_count(engine, DBConnector.TABLE)
-
-        while args is None and page < max_page:
-            page += 1
-            args = DBConnector.get_row(
-                engine,
-                DBConnector.TABLE,
-                page,
-                columns=[
-                    DBCOLUMNS.image,
-                    DBCOLUMNS.title,
-                    DBCOLUMNS.content,
-                    DBCOLUMNS.tag,
-                ],
-            )
-
-        img, title, content, tag = args
-
-        src = base64.b64encode(img)
-        src = "data:image/png;base64,{}".format(src.decode())
-        return Layout.get_main_section(src, title, content, tag)
-    raise PreventUpdate
+        if args:
+            return Layout.get_main_section(args)
+    return html.Div()
 
 
 @callback(
-    [
-        Output("main", "children", allow_duplicate=True),
-        Output("pagination", "page"),
-    ],
+    Output("pagination", "page"),
     Input("go_to_page", "n_clicks"),
     State("page_id", "value"),
     prevent_initial_call=True,
 )
 def go_to_page(clicks, page):
     if clicks:
-        return change_page(page), page
-    raise PreventUpdate
-
-
-@callback(
-    Output("download-ctn", "data"),
-    Input("download-btn", "n_clicks"),
-    [State("pagination", "page")],
-    prevent_initial_call=True,
-)
-def download(n_clicks, page):
-    if n_clicks and page:
-        img, title, content, tag = DBConnector.get_row(
-            engine,
-            DBConnector.TABLE,
-            page,
-            columns=[
-                DBCOLUMNS.image,
-                DBCOLUMNS.title,
-                DBCOLUMNS.content,
-                DBCOLUMNS.tag,
-            ],
-        )
-        text = "\n".join([title, content, tag])
-
-        list_of_tuples = [("image.png", io.BytesIO(img)), ("text.txt", text)]
-
-        with tempfile.NamedTemporaryFile(prefix="profile_", suffix=".zip") as tmp:
-            with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED, False) as zip_file:
-                for file_name, data in list_of_tuples:
-                    if isinstance(data, str):
-                        zip_file.writestr(file_name, data)
-                    else:
-                        zip_file.writestr(file_name, data.read())
-
-            return dcc.send_file(tmp.name)
+        return page
     raise PreventUpdate

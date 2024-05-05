@@ -22,6 +22,7 @@ class DataCollector(ABC):
         self.end_date = self._convert_date_to_format(end_date)
         self.timeout = timeout
         self.opener = urllib.request.build_opener()
+        self.opener.addheaders = [("User-agent", "Mozilla/5.0")]
 
     def _convert_date_to_format(self, str_date):
         if str_date is not None:
