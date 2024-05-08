@@ -17,16 +17,22 @@ engine = DBConnector.get_engine(DBConnector.DBNAME)
         Input("tag", "value"),
         Input("date", "value"),
         Input("filter_by_text", "n_clicks"),
+        Input("switch", "checked"),
     ],
     State("query", "value"),
 )
-def create_content(tag, date_range, n_clicks, query):
+def create_content(tag, date_range, n_clicks, switch, query):
     if tag or date_range or n_clicks:
         min_max_date = DBConnector.get_min_max_dates(engine, DBConnector.TABLE)
-
-        if tag != "All" or min_max_date != date_range or n_clicks:
+        if tag != "All" or min_max_date != date_range or n_clicks or switch:
             DBConnector.create_view(
-                engine, DBConnector.TABLE, DBConnector.VIEW, tag, date_range, query
+                engine,
+                DBConnector.TABLE,
+                DBConnector.VIEW,
+                tag,
+                date_range,
+                query,
+                switch,
             )
             DBConnector.TABLE_VIEW = DBConnector.VIEW
         else:

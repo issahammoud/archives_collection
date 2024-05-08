@@ -17,8 +17,11 @@ class LeMondeCollector(DataCollector):
         super().__init__(url_format, date_format, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
-        figure_url = section.figure.picture.source.get("data-srcset")
-        image = self.get_url_content(figure_url)
+        try:
+            figure_url = section.figure.picture.source.get("data-srcset")
+            image = self.get_url_content(figure_url)
+        except Exception:
+            image = None
         title = section.a.h3.text.strip()
         content = section.a.p.text.strip()
         tag = section.a.span.text.strip().title()
@@ -46,8 +49,11 @@ class LeFigaroCollector(DataCollector):
         super().__init__(url_format, date_format, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
-        figure_url = section.img.get("srcset").split()[-2]
-        image = self.get_url_content(figure_url)
+        try:
+            figure_url = section.img.get("srcset").split()[-2]
+            image = self.get_url_content(figure_url)
+        except Exception:
+            image = None
         title = section.h2.text.strip()
         content = section.div.text.strip()
         tag = section.ul.select("li")[-1].text.strip()
@@ -73,8 +79,11 @@ class LesEchosCollector(DataCollector):
         super().__init__(url_format, date_format, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
-        figure_url = section.a.picture.select("source")[-1].get("srcset")
-        image = self.get_url_content(figure_url)
+        try:
+            figure_url = section.a.picture.select("source")[-1].get("srcset")
+            image = self.get_url_content(figure_url)
+        except Exception:
+            image = None
         title = section.h3.text.strip()
         content = section.select("a")[1].select("div")[-1].text.strip()
         tag = None
@@ -105,8 +114,11 @@ class VingthMinutesCollector(DataCollector):
         url_content = self.get_url_content(section_url)
         section_content = BeautifulSoup(url_content, "html.parser")
 
-        figure_url = section_content.figure.img.get("src")
-        image = self.get_url_content(figure_url)
+        try:
+            figure_url = section_content.figure.img.get("src")
+            image = self.get_url_content(figure_url)
+        except Exception:
+            image = None
         title = section_content.h1.text.strip()
 
         content = section_content.select("header > div > span")[-1].text.strip()

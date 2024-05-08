@@ -75,9 +75,13 @@ class Layout:
                         span=4,
                     ),
                     dmc.Col(
-                        dmc.Select(id="tag", data=tags, value="All", searchable=True),
-                        span=2,
+                        dmc.Switch(id="switch", onLabel="Image Only", offLabel="ALL"),
+                        span=1,
                         offset=4,
+                    ),
+                    dmc.Col(
+                        dmc.Select(id="tag", data=tags, value="All", searchable=True),
+                        span=1,
                     ),
                     dmc.Col(
                         dmc.DateRangePicker(
@@ -90,6 +94,8 @@ class Layout:
                         span=2,
                     ),
                 ],
+                align="center",
+                justify="flex-start",
             ),
             height=100,
             withBorder=True,
@@ -165,7 +171,11 @@ class Layout:
 
     @staticmethod
     def get_card(byte_img, title, content, tag, archive, date, link):
-        src = "data:image/png;base64,{}".format(base64.b64encode(byte_img).decode())
+        src = (
+            "data:image/png;base64,{}".format(base64.b64encode(byte_img).decode())
+            if byte_img
+            else None
+        )
         date = datetime.strftime(date, "%B, %d %Y")
         archive = archive.strip().title() if archive else archive
         tag = tag.strip().title() if tag else tag
@@ -185,7 +195,12 @@ class Layout:
                     py="xs",
                 ),
                 dmc.CardSection(
-                    dmc.Image(src=src, height=300),
+                    dmc.Image(
+                        src=src,
+                        height=300,
+                        withPlaceholder=True,
+                        placeholder="Placeholder",
+                    ),
                     mb=10,
                 ),
                 dmc.Text(title, fw=500, size="md", truncate=True),

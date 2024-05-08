@@ -73,7 +73,7 @@ class DBConnector:
             connection.commit()
 
     @staticmethod
-    def create_view(engine, table_name, view_name, tag, date_range, query):
+    def create_view(engine, table_name, view_name, tag, date_range, query, switch):
         min_date, max_date = date_range
         data = {"date_1": min_date, "date_2": max_date}
 
@@ -81,6 +81,9 @@ class DBConnector:
         if tag and tag != "All":
             condition = "AND TRIM(UPPER(tag)) = :tag_1 "
             data.update({"tag_1": tag.strip().upper()})
+
+        if switch:
+            condition += "AND image IS NOT NULL "
 
         if query:
             query = query = " & ".join(query.split())
@@ -189,6 +192,17 @@ class DBConnector:
             rows = result.fetchall()
 
         return rows
+
+    @staticmethod
+    def get_archive_count(engine, table, archive):
+        with engine.connect() as connection:
+            result = connection.execute(
+                text(f"SELECT COUNT(*) FROM {table} WHERE archive = :arx"),
+                {"arx": archive},
+            )
+            count = result.fetchone()[0]
+
+        return count
 
     @staticmethod
     def insert_row(engine, table, kwargs):
