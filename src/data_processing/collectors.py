@@ -1,5 +1,7 @@
 import logging
+from functools import partial
 from bs4 import BeautifulSoup
+from babel.dates import format_datetime
 from src.helpers.enum import Archives, DBCOLUMNS
 from src.data_processing.data_collector import DataCollector
 
@@ -7,14 +9,15 @@ from src.data_processing.data_collector import DataCollector
 logger = logging.getLogger(__name__)
 
 
-class LeMondeCollector(DataCollector):
+class LeMonde(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.lemonde.fr/archives-du-monde/{}/"
-        date_format = "%d-%m-%Y"
         self.archive = Archives.lemonde
         self.content_selector = "section#river > section.teaser"
 
-        super().__init__(url_format, date_format, begin_date, end_date, timeout)
+        date2str = partial(format_datetime, format="dd-MM-Y")
+
+        super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
         try:
@@ -37,16 +40,17 @@ class LeMondeCollector(DataCollector):
         return data
 
 
-class LeFigaroCollector(DataCollector):
+class LeFigaro(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = (
             "https://recherche.lefigaro.fr/recherche/tout/?datemin={0}&datemax={0}"
         )
-        date_format = "%d-%m-%Y"
         self.archive = Archives.lefigaro
         self.content_selector = "#articles-list > article"
 
-        super().__init__(url_format, date_format, begin_date, end_date, timeout)
+        date2str = partial(format_datetime, format="dd-MM-Y")
+
+        super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
         try:
@@ -69,14 +73,15 @@ class LeFigaroCollector(DataCollector):
         return data
 
 
-class LesEchosCollector(DataCollector):
+class LesEchos(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.lesechos.fr/{}"
-        date_format = "%Y/%m"
         self.archive = Archives.lesechos
         self.content_selector = "div > article"
+        self.page_selector = "section ul > li > a"
 
-        super().__init__(url_format, date_format, begin_date, end_date, timeout)
+        date2str = partial(format_datetime, format="Y/MM")
+        super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
         try:
@@ -100,14 +105,16 @@ class LesEchosCollector(DataCollector):
         return data
 
 
-class VingthMinutesCollector(DataCollector):
+class VingthMinutes(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.20minutes.fr/archives/{}"
         self._base_url = "https://www.20minutes.fr"
-        date_format = "%Y/%m-%d"
+
         self.archive = Archives.vinghtminutes
         self.content_selector = "section > div > ul > li"
-        super().__init__(url_format, date_format, begin_date, end_date, timeout)
+
+        date2str = partial(format_datetime, format="Y/MM-dd")
+        super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
         section_url = self._base_url + section.a.get("href")
@@ -123,6 +130,151 @@ class VingthMinutesCollector(DataCollector):
 
         content = section_content.select("header > div > span")[-1].text.strip()
         tag = section_content.select("header > div > span")[0].text.strip()
+
+        data = {
+            DBCOLUMNS.image: image,
+            DBCOLUMNS.title: title,
+            DBCOLUMNS.content: content,
+            DBCOLUMNS.tag: tag,
+            DBCOLUMNS.link: section_url,
+            DBCOLUMNS.archive: self.archive,
+        }
+        return data
+
+
+class OuestFrance(DataCollector):
+    def __init__(self, begin_date, end_date, timeout):
+        url_format = "https://www.ouest-france.fr/archives/{}"
+        self.archive = Archives.ouestfrance
+        self.content_selector = "article > div"
+        self.page_selector = "nav > ul > li"
+
+        date2str = partial(format_datetime, format="Y/dd-MMMM-Y", locale="fr")
+        super().__init__(url_format, date2str, begin_date, end_date, timeout)
+
+    def parse_single_section(self, section):
+        section_url = section.a.get("href")
+        url_content = self.get_url_content(section_url)
+        section_content = BeautifulSoup(url_content, "html.parser")
+
+        try:
+            figure_url = section_content.article.header.figure.img.get(
+                "srcset"
+            ).split()[-2]
+            image = self.get_url_content(figure_url)
+        except Exception:
+            image = None
+        title = section_content.article.header.h1.text.strip()
+
+        content = section_content.article.header.p.text.strip()
+        tag = section_url.split("/")[-2].strip()
+
+        data = {
+            DBCOLUMNS.image: image,
+            DBCOLUMNS.title: title,
+            DBCOLUMNS.content: content,
+            DBCOLUMNS.tag: tag,
+            DBCOLUMNS.link: section_url,
+            DBCOLUMNS.archive: self.archive,
+        }
+        return data
+
+
+class Liberation(DataCollector):
+    def __init__(self, begin_date, end_date, timeout):
+        url_format = "https://www.liberation.fr/archives/{}"
+        self._base_url = "https://www.liberation.fr/"
+        self.archive = Archives.liberation
+        self.content_selector = "main article"
+
+        date2str = partial(format_datetime, format="Y/MM/dd")
+        super().__init__(url_format, date2str, begin_date, end_date, timeout)
+
+    def parse_single_section(self, section):
+        section_url = self._base_url + section.a.get("href")
+        url_content = self.get_url_content(section_url)
+        section_content = BeautifulSoup(url_content, "html.parser")
+
+        try:
+            figure_url = section_content.main.img.get("src")
+            image = self.get_url_content(figure_url)
+        except Exception:
+            image = None
+        title = section_content.main.h1.text.strip()
+
+        content = section_content.select("main > div > div > span")[-1].text.strip()
+        tag = section_content.select("main > div > div > div > div > span")[
+            -1
+        ].text.strip()
+        tag = tag if tag else None
+
+        data = {
+            DBCOLUMNS.image: image,
+            DBCOLUMNS.title: title,
+            DBCOLUMNS.content: content,
+            DBCOLUMNS.tag: tag,
+            DBCOLUMNS.link: section_url,
+            DBCOLUMNS.archive: self.archive,
+        }
+        return data
+
+
+class Mediapart(DataCollector):
+    def __init__(self, begin_date, end_date, timeout):
+        url_format = "https://www.mediapart.fr/journal/une/{}"
+        self._base_url = "https://www.mediapart.fr"
+        self.archive = Archives.mediapart
+        self.content_selector = "section"
+
+        date2str = partial(format_datetime, format="ddMMYY")
+        super().__init__(url_format, date2str, begin_date, end_date, timeout)
+
+    def parse_single_section(self, section):
+        try:
+            figure_url = section.img.get("src")
+            image = self.get_url_content(figure_url)
+        except Exception:
+            image = None
+        title = section.h2.text.strip()
+        content = section.select("p")[-2].text.strip()
+        tag = section.select("p")[0].text.strip()
+        section_url = self._base_url + section.a.get("href")
+        data = {
+            DBCOLUMNS.image: image,
+            DBCOLUMNS.title: title,
+            DBCOLUMNS.content: content,
+            DBCOLUMNS.tag: tag,
+            DBCOLUMNS.link: section_url,
+            DBCOLUMNS.archive: self.archive,
+        }
+        return data
+
+
+class LeParisien(DataCollector):
+    def __init__(self, begin_date, end_date, timeout):
+        url_format = "https://www.leparisien.fr/archives/{}"
+        self._base_url = "https://www.leparisien.fr"
+        self.archive = Archives.leparisien
+        self.content_selector = "#top div > div > a"
+
+        date2str = partial(format_datetime, format="Y/dd-MM-Y")
+        super().__init__(url_format, date2str, begin_date, end_date, timeout)
+
+    def parse_single_section(self, section):
+        section_url = "https:" + section.a.get("href")
+        url_content = self.get_url_content(section_url)
+        section_content = BeautifulSoup(url_content, "html.parser")
+
+        try:
+            figure_url = self._base_url + section_content.section.img.get("src")
+            image = self.get_url_content(figure_url)
+        except Exception:
+            image = None
+        title = section_content.h1.text.strip()
+
+        content = section_content.p.text.strip()
+        tag = section_url.split("/")[-2]
+        tag = tag if tag else None
 
         data = {
             DBCOLUMNS.image: image,

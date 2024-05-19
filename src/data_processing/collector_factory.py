@@ -9,11 +9,16 @@ from src.helpers.enum import Archives
 from src.helpers.db_connector import DBConnector
 
 from src.utils.utils import alternate_elements
+from src.data_processing.decorators import AddPages
 from src.data_processing.collectors import (
-    LeMondeCollector,
-    LeFigaroCollector,
-    LesEchosCollector,
-    VingthMinutesCollector,
+    LeMonde,
+    LeFigaro,
+    LesEchos,
+    VingthMinutes,
+    OuestFrance,
+    Liberation,
+    Mediapart,
+    LeParisien,
 )
 
 
@@ -23,10 +28,14 @@ engine = DBConnector.get_engine(DBConnector.DBNAME)
 
 class CollectorFactory:
     MAPPING = {
-        Archives.lemonde: LeMondeCollector,
-        Archives.lefigaro: LeFigaroCollector,
-        Archives.lesechos: LesEchosCollector,
-        Archives.vinghtminutes: VingthMinutesCollector,
+        Archives.lemonde: LeMonde,
+        Archives.lefigaro: LeFigaro,
+        Archives.lesechos: LesEchos,
+        Archives.vinghtminutes: VingthMinutes,
+        Archives.ouestfrance: OuestFrance,
+        Archives.liberation: Liberation,
+        Archives.mediapart: Mediapart,
+        Archives.leparisien: LeParisien,
     }
 
     def __init__(self, collectors_names, workers, **kwargs) -> None:
@@ -37,7 +46,10 @@ class CollectorFactory:
             assert (
                 name in CollectorFactory.MAPPING
             ), f"Unknown collector {name}. Should be one of {Archives}"
-            self.collectors.append(CollectorFactory.MAPPING[name](**kwargs))
+            collector = CollectorFactory.MAPPING[name](**kwargs)
+            if name in [Archives.lesechos, Archives.ouestfrance]:
+                collector = AddPages(collector)
+            self.collectors.append(collector)
 
         assert (
             len(self.collectors) > 0
@@ -53,10 +65,11 @@ class CollectorFactory:
         assert len(all_urls) > 0, "No pages to collect"
         return all_urls
 
-    def parse_single_page(self, url):
+    def parse_single_page(self, args):
+        date, url = args
         for collector in self.collectors:
             if re.match(collector.url_format.replace("?", "\?").format(".*"), url):
-                collector.parse_single_page(url, collector.content_selector)
+                collector.parse_single_page(date, url, collector.content_selector)
                 break
 
     def run(self):
