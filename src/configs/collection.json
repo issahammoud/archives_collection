@@ -1,6 +1,6 @@
 {
-"archives": ["lemonde", "lefigaro", "lesechos", "vinghtminutes", "ouestfrance", "mediapart", "leparisien"],
+"archives": ["lemonde", "lefigaro", "lesechos", "vinghtminutes", "mediapart", "leparisien"],
 "begin_date": "01-01-2000",
 "end_date": null,
-"workers": 4,
+"workers": 6,
 "timeout": 5}

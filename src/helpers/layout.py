@@ -1,5 +1,4 @@
 import base64
-import numpy as np
 from dash import dcc, html
 import plotly.express as px
 from datetime import datetime
@@ -7,6 +6,7 @@ import plotly.graph_objs as go
 from dash_iconify import DashIconify
 import dash_mantine_components as dmc
 from src.helpers.db_connector import DBConnector
+from src.helpers.enum import Archives
 
 
 engine = DBConnector.get_engine(DBConnector.DBNAME)
@@ -45,136 +45,161 @@ class Graph:
 
 
 class Layout:
+    PAGES = 3
+
     @staticmethod
     def get_navbar():
         tags = DBConnector.get_tags(engine, DBConnector.TABLE)
         tags = ["All"] + [tag[0].title() for tag in tags if tag[0]]
-        header = dmc.Header(
-            dmc.Grid(
-                [
-                    dmc.Col(
-                        dmc.Group(
-                            [
-                                dmc.TextInput(
-                                    id="query",
-                                    placeholder="Filter by text",
-                                    rightSection=DashIconify(
-                                        icon="material-symbols-light:search"
-                                    ),
-                                ),
-                                dmc.Button(
-                                    "Search",
-                                    id="filter_by_text",
-                                    size="sm",
-                                    variant="light",
-                                ),
-                            ],
-                            align="center",
-                            spacing="xs",
-                        ),
-                        span=4,
-                    ),
-                    dmc.Col(
-                        dmc.Switch(id="switch", onLabel="Image Only", offLabel="ALL"),
-                        span=1,
-                        offset=4,
-                    ),
-                    dmc.Col(
-                        dmc.Select(id="tag", data=tags, value="All", searchable=True),
-                        span=1,
-                    ),
-                    dmc.Col(
-                        dmc.DateRangePicker(
-                            id="date",
-                            allowSingleDateInRange=False,
-                            value=DBConnector.get_min_max_dates(
-                                engine, DBConnector.TABLE
+        header = dmc.Grid(
+            [
+                dmc.GridCol(
+                    dmc.Menu(
+                        [
+                            dmc.MenuTarget(
+                                dmc.ActionIcon(
+                                    DashIconify(icon="material-symbols:menu"),
+                                    size="lg",
+                                    variant="filled",
+                                    color="blue",
+                                )
                             ),
-                        ),
-                        span=2,
+                            dmc.MenuDropdown(
+                                [
+                                    dmc.MenuLabel("Filters"),
+                                    dmc.MenuItem(
+                                        dmc.Select(
+                                            id="tag",
+                                            data=tags,
+                                            value="All",
+                                            w=180,
+                                            maxDropdownHeight=200,
+                                            searchable=True,
+                                        ),
+                                        leftSection=DashIconify(
+                                            icon="icon-park-outline:topic"
+                                        ),
+                                        closeMenuOnClick=False,
+                                    ),
+                                    dmc.MenuItem(
+                                        dmc.DatePicker(
+                                            id="date",
+                                            valueFormat="DD/MM/YY",
+                                            allowSingleDateInRange=False,
+                                            value=DBConnector.get_min_max_dates(
+                                                engine, DBConnector.TABLE
+                                            ),
+                                            type="multiple",
+                                            w=180,
+                                        ),
+                                        leftSection=DashIconify(icon="uiw:date"),
+                                        closeMenuOnClick=False,
+                                    ),
+                                    dmc.MenuItem(
+                                        dmc.Switch(
+                                            id="switch",
+                                            size="sm",
+                                            offLabel=DashIconify(
+                                                icon="iconoir:off-tag", width=20
+                                            ),
+                                            onLabel=DashIconify(
+                                                icon="iconoir:on-tag", width=20
+                                            ),
+                                        ),
+                                        closeMenuOnClick=False,
+                                    ),
+                                    dmc.MenuDivider(),
+                                    dmc.MenuLabel("Search"),
+                                    dmc.MenuItem(
+                                        dmc.TextInput(
+                                            id="query",
+                                            placeholder="Search by text",
+                                            w=180,
+                                        ),
+                                        leftSection=dmc.ActionIcon(
+                                            DashIconify(
+                                                icon="material-symbols-light:search"
+                                            ),
+                                            id="filter_by_text",
+                                        ),
+                                        closeMenuOnClick=False,
+                                    ),
+                                    dmc.MenuItem(
+                                        dmc.TextInput(
+                                            id="article_id",
+                                            placeholder="Search by URL",
+                                            w=180,
+                                        ),
+                                        leftSection=dmc.ActionIcon(
+                                            DashIconify(icon="mynaui:hash"),
+                                            id="filter_by_hash",
+                                        ),
+                                        closeMenuOnClick=False,
+                                    ),
+                                ]
+                            ),
+                        ],
+                        trigger="hover",
+                        closeOnItemClick=False,
+                        closeOnEscape=False,
+                        withArrow=True,
                     ),
-                ],
-                align="center",
-                justify="flex-start",
-            ),
-            height=100,
-            withBorder=True,
-            style={
-                "backgroundColor": "#5ca6ee",
-                "padding": "0 10px 0 10px",
-                "boxShadow": "0 2px 1px rgba(207, 218, 228, .2)",
-                "borderRadius": "4px",
-            },
+                    span=1,
+                ),
+            ],
+            align="center",
+            justify="flex-end",
         )
 
         return header
 
     @staticmethod
-    def get_pagination(active_page, max, df):
-        if max <= 0:
-            return html.Div(id="pagination")
-        pagination = dmc.Grid(
+    def archive_filter():
+        ckeckbox_group = dmc.CheckboxGroup(
             [
-                dmc.Col(
-                    dmc.Pagination(
-                        id="pagination",
-                        total=int(np.round(max / 3)),
-                        withEdges=False,
-                        withControls=True,
-                        size="lg",
-                        page=active_page,
-                        siblings=1,
-                    ),
-                    span=6,
+                dmc.Group(
+                    [dmc.Checkbox(label=val.title(), value=val) for val in Archives],
+                    align="center",
                 ),
-                dmc.Col(
-                    dmc.Group(
-                        [
-                            dmc.Tooltip(
-                                dmc.ActionIcon(
-                                    DashIconify(icon="nonicons:go-16"),
-                                    size="lg",
-                                    variant="subtle",
-                                    id="go_to_page",
-                                ),
-                                label="Go to",
-                                offset=3,
-                                withArrow=True,
-                            ),
-                            dmc.NumberInput(
-                                value=active_page,
-                                id="page_id",
-                                min=1,
-                                step=1,
-                                max=max,
-                                hideControls=True,
-                                style={"width": 50},
-                            ),
-                        ],
-                        spacing=0,
-                        position="center",
-                    ),
-                    span=1,
-                ),
-                dmc.Col(
+            ],
+            id="source",
+            value=[val.value for val in Archives],
+        )
+        toggle = dmc.Switch(
+            id="toggle",
+            checked=True,
+            onLabel=DashIconify(
+                icon="teenyicons:tick-outline", width=20, color="green"
+            ),
+            offLabel=DashIconify(icon="akar-icons:cross", width=20, color="red"),
+        )
+        return dmc.Center(
+            dmc.Group([toggle, ckeckbox_group], align="flex-end", gap="xl")
+        )
+
+    @staticmethod
+    def get_stats(df):
+        stats_bar = dmc.Grid(
+            [
+                dmc.GridCol(
                     Graph.get_graph(
                         df,
                         DBConnector.get_min_max_dates(engine, DBConnector.TABLE_VIEW),
                     ),
-                    span="auto",
+                    span=12,
                 ),
             ],
             justify="center",
             align="flex-end",
         )
-        return pagination
+        return stats_bar
 
     @staticmethod
-    def get_card(byte_img, title, content, tag, archive, date, link):
+    def get_card(rowid, byte_img, title, content, tag, archive, date, link):
         src = (
             "data:image/png;base64,{}".format(base64.b64encode(byte_img).decode())
             if byte_img
-            else None
+            else "https://placehold.co/600x400?text=Placeholder"
         )
         date = datetime.strftime(date, "%B, %d %Y")
         archive = archive.strip().title() if archive else archive
@@ -186,7 +211,7 @@ class Layout:
                     dmc.Group(
                         [
                             dmc.Text(archive, fw=700),
-                            dmc.Text(date, italic=True, fw=400, align="center"),
+                            dmc.Text(date, td="italic", fw=400),
                         ],
                         grow=True,
                     ),
@@ -195,22 +220,51 @@ class Layout:
                     py="xs",
                 ),
                 dmc.CardSection(
-                    dmc.Image(
-                        src=src,
-                        height=300,
-                        withPlaceholder=True,
-                        placeholder="Placeholder",
-                    ),
+                    dmc.Image(fallbackSrc=src, h=300),
                     mb=10,
                 ),
-                dmc.Text(title, fw=500, size="md", truncate=True),
-                dmc.Blockquote(
-                    dmc.Text(content, size="sm", align="justify"),
-                    color="red",
-                    style={"height": 150, "overflowY": "hidden"},
-                ),
-                dmc.CardSection(
-                    dmc.Text(tag, size="sm", color="dimmed", italic=True), pb=10, pl=20
+                dmc.Stack(
+                    [
+                        dmc.Tooltip(
+                            dmc.Text(title, fw=500, size="md", truncate=True),
+                            label=title,
+                            multiline=True,
+                            withArrow=True,
+                            openDelay=3,
+                        ),
+                        dmc.Blockquote(
+                            dmc.Text(
+                                content,
+                                size="sm",
+                                style={"verticalAlign": "top", "textAlign": "justify"},
+                            ),
+                            color="blue",
+                            radius="sm",
+                            icon=DashIconify(
+                                icon="teenyicons:quote-solid",
+                                width=25,
+                                color="red",
+                                style={
+                                    "position": "absolute",
+                                    "top": 25,
+                                    "left": 30,
+                                    "zIndex": 1,
+                                },
+                            ),
+                            style={
+                                "height": 150,
+                                "overflowY": "hidden",
+                                "background": "white",
+                            },
+                        ),
+                        dmc.CardSection(
+                            dmc.Text(
+                                tag, size="sm", c="dimmed", td="italic", ta="left"
+                            ),
+                            pb=10,
+                            pl=20,
+                        ),
+                    ]
                 ),
             ],
             withBorder=True,
@@ -225,36 +279,72 @@ class Layout:
     @staticmethod
     def get_main_section(args):
         cards = []
-        for i in range(len(args)):
-            cards.append(Layout.get_card(*args[i]))
-
-        main = dmc.Grid(
-            [dmc.Col(card, span=12 // len(args)) for card in cards],
-            align="stretch",
-            justify="center",
+        previous = dmc.ActionIcon(
+            DashIconify(icon="fluent:previous-32-filled"),
+            id="previous",
+            variant="subtle",
+            size="xl",
+            style={
+                "position": "absolute",
+                "zIndex": 100,
+                "top": "50%",
+                "left": 0,
+                "marginLeft": "-50px",
+            },
         )
+        next = dmc.ActionIcon(
+            DashIconify(icon="fluent:next-32-filled"),
+            id="next",
+            variant="subtle",
+            size="xl",
+            style={
+                "position": "absolute",
+                "zIndex": 100,
+                "top": "50%",
+                "right": 0,
+                "marginRight": "-50px",
+            },
+        )
+
+        for i in range(len(args)):
+            card = Layout.get_card(*args[i])
+            cards.append(dmc.GridCol(card, span=12 // len(args)))
+
+        cards.extend([previous, next])
+        main = dmc.Grid(cards, style={"position": "relative"})
 
         return main
 
     @staticmethod
     def get_layout():
         header = Layout.get_navbar()
-
-        return dmc.Container(
+        checkboxes = Layout.archive_filter()
+        appshell = dmc.AppShell(
             [
-                dmc.Container(
-                    header,
-                    size="xl",
-                    style={"marginBottom": 50},
+                dmc.AppShellHeader(
+                    dmc.Container(
+                        header,
+                        size="xl",
+                    ),
+                    withBorder=True,
+                    p=10,
                 ),
-                dmc.Container(
-                    html.Div(id="left_side"),
-                    size="xl",
-                    style={"marginBottom": 30},
+                dmc.Space(h=90),
+                dmc.AppShellSection(
+                    dmc.Container(
+                        checkboxes,
+                        size="xl",
+                    ),
+                    m=30,
                 ),
-                dmc.Container(
-                    html.Div(id="main"), size="xl", style={"marginBottom": 50}
+                dmc.AppShellSection(
+                    dmc.Container(
+                        id="stats_bar",
+                        size="xl",
+                    ),
+                    m=30,
                 ),
-            ],
-            size="xl",
+                dmc.AppShellMain(dmc.Container(id="main", size="xl")),
+            ]
         )
+        return dmc.MantineProvider(appshell)

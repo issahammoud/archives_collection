@@ -19,6 +19,7 @@ from src.data_processing.collectors import (
     Liberation,
     Mediapart,
     LeParisien,
+    LHumanite,
 )
 
 
@@ -36,6 +37,7 @@ class CollectorFactory:
         Archives.liberation: Liberation,
         Archives.mediapart: Mediapart,
         Archives.leparisien: LeParisien,
+        Archives.lhumanite: LHumanite,
     }
 
     def __init__(self, collectors_names, workers, **kwargs) -> None:
@@ -47,7 +49,7 @@ class CollectorFactory:
                 name in CollectorFactory.MAPPING
             ), f"Unknown collector {name}. Should be one of {Archives}"
             collector = CollectorFactory.MAPPING[name](**kwargs)
-            if name in [Archives.lesechos, Archives.ouestfrance]:
+            if name in [Archives.lesechos, Archives.ouestfrance, Archives.lhumanite]:
                 collector = AddPages(collector)
             self.collectors.append(collector)
 
@@ -78,7 +80,9 @@ class CollectorFactory:
 
         count_before = {}
         for name in self.collectors_names:
-            count_before[name] = DBConnector.get_count(engine, DBConnector.TABLE, name)
+            count_before[name] = DBConnector.get_archive_count(
+                engine, DBConnector.TABLE, name
+            )
 
         logger.info(f"Getting the data for {len(urls)} dates")
         start = time.time()
@@ -93,7 +97,7 @@ class CollectorFactory:
         end = np.round((time.time() - start) / 60, 2)
 
         for name in self.collectors_names:
-            rows_nb = DBConnector.get_count(engine, DBConnector.TABLE, name)
+            rows_nb = DBConnector.get_archive_count(engine, DBConnector.TABLE, name)
             diff = rows_nb - count_before[name]
             logger.info(
                 f"\nFor {name}:\n"

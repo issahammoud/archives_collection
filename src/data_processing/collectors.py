@@ -1,6 +1,7 @@
 import logging
 from functools import partial
 from bs4 import BeautifulSoup
+from datetime import datetime
 from babel.dates import format_datetime
 from src.helpers.enum import Archives, DBCOLUMNS
 from src.data_processing.data_collector import DataCollector
@@ -14,7 +15,7 @@ class LeMonde(DataCollector):
         url_format = "https://www.lemonde.fr/archives-du-monde/{}/"
         self.archive = Archives.lemonde
         self.content_selector = "section#river > section.teaser"
-
+        self.min_date = datetime.strptime("19-12-1944", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="dd-MM-Y")
 
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
@@ -47,7 +48,7 @@ class LeFigaro(DataCollector):
         )
         self.archive = Archives.lefigaro
         self.content_selector = "#articles-list > article"
-
+        self.min_date = datetime.strptime("01-01-2005", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="dd-MM-Y")
 
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
@@ -79,7 +80,8 @@ class LesEchos(DataCollector):
         self.archive = Archives.lesechos
         self.content_selector = "div > article"
         self.page_selector = "section ul > li > a"
-
+        self.page_url_suffix = "?page={}"
+        self.min_date = datetime.strptime("01-01-1991", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y/MM")
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
@@ -112,7 +114,7 @@ class VingthMinutes(DataCollector):
 
         self.archive = Archives.vinghtminutes
         self.content_selector = "section > div > ul > li"
-
+        self.min_date = datetime.strptime("01-01-2006", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y/MM-dd")
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
@@ -148,7 +150,8 @@ class OuestFrance(DataCollector):
         self.archive = Archives.ouestfrance
         self.content_selector = "article > div"
         self.page_selector = "nav > ul > li"
-
+        self.page_url_suffix = "?page={}"
+        self.min_date = datetime.strptime("01-01-2006", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y/dd-MMMM-Y", locale="fr")
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
@@ -186,7 +189,7 @@ class Liberation(DataCollector):
         self._base_url = "https://www.liberation.fr/"
         self.archive = Archives.liberation
         self.content_selector = "main article"
-
+        self.min_date = datetime.strptime("01-01-1998", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y/MM/dd")
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
@@ -225,7 +228,7 @@ class Mediapart(DataCollector):
         self._base_url = "https://www.mediapart.fr"
         self.archive = Archives.mediapart
         self.content_selector = "section"
-
+        self.min_date = datetime.strptime("01-01-2009", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="ddMMYY")
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
@@ -256,12 +259,13 @@ class LeParisien(DataCollector):
         self._base_url = "https://www.leparisien.fr"
         self.archive = Archives.leparisien
         self.content_selector = "#top div > div > a"
-
+        self.min_date = datetime.strptime("01-04-2009", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y/dd-MM-Y")
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
-        section_url = "https:" + section.a.get("href")
+        section_url = "https:" + section.get("href")
+        logger.debug(f"getting data for section from {section_url}")
         url_content = self.get_url_content(section_url)
         section_content = BeautifulSoup(url_content, "html.parser")
 
@@ -275,6 +279,44 @@ class LeParisien(DataCollector):
         content = section_content.p.text.strip()
         tag = section_url.split("/")[-2]
         tag = tag if tag else None
+
+        data = {
+            DBCOLUMNS.image: image,
+            DBCOLUMNS.title: title,
+            DBCOLUMNS.content: content,
+            DBCOLUMNS.tag: tag,
+            DBCOLUMNS.link: section_url,
+            DBCOLUMNS.archive: self.archive,
+        }
+        return data
+
+
+class LHumanite(DataCollector):
+    def __init__(self, begin_date, end_date, timeout):
+        url_format = "https://www.humanite.fr/?s=&start_date={0}&end_date={0}"
+        self.archive = Archives.lhumanite
+        self.content_selector = "article a"
+        self.page_selector = "nav > div > div"
+        self.page_url_suffix = "&page={}"
+        self.min_date = datetime.strptime("01-01-1998", "%d-%m-%Y").date()
+        date2str = partial(format_datetime, format="Y-MM-dd")
+        super().__init__(url_format, date2str, begin_date, end_date, timeout)
+
+    def parse_single_section(self, section):
+        section_url = section.get("href")
+        logger.debug(f"getting data for section from {section_url}")
+        url_content = self.get_url_content(section_url)
+        section_content = BeautifulSoup(url_content, "html.parser")
+
+        try:
+            figure_url = section_content.figure.img.get("src")
+            image = self.get_url_content(figure_url)
+        except Exception:
+            image = None
+        title = section_content.h1.text.strip()
+
+        content = section_content.article.p.text.strip()
+        tag = section_content.article.a.text.strip()
 
         data = {
             DBCOLUMNS.image: image,

@@ -19,6 +19,7 @@ class DataCollector(ABC):
         self.url_format = url_format
         self.date2str = date2str
         self.begin_date = self._convert_to_date(begin_date)
+        self.begin_date = max(self.begin_date, self.min_date)
         self.end_date = self._convert_to_date(end_date)
         self.timeout = timeout
 
@@ -30,7 +31,6 @@ class DataCollector(ABC):
         return datetime.now().date()
 
     def get_all_url(self, archive):
-
         all_dates = set()
         for day in range((self.end_date - self.begin_date + timedelta(days=1)).days):
             date = self.begin_date + timedelta(days=day)

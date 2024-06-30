@@ -4,7 +4,7 @@ from dash import Input, State, Output, callback, html
 
 
 from src.helpers.layout import Layout
-from src.helpers.enum import DBCOLUMNS
+from src.helpers.enum import DBCOLUMNS, Archives
 from src.helpers.db_connector import DBConnector
 
 
@@ -12,8 +12,11 @@ engine = DBConnector.get_engine(DBConnector.DBNAME)
 
 
 @callback(
-    Output("left_side", "children"),
+    Output("stats_bar", "children"),
+    Output("main", "children"),
+    Output("article_id", "value"),
     [
+        Input("source", "value"),
         Input("tag", "value"),
         Input("date", "value"),
         Input("filter_by_text", "n_clicks"),
@@ -21,10 +24,13 @@ engine = DBConnector.get_engine(DBConnector.DBNAME)
     ],
     State("query", "value"),
 )
-def create_content(tag, date_range, n_clicks, switch, query):
-    if tag or date_range or n_clicks:
+def create_content(source, tag, date_range, n_clicks, switch, query):
+    if source or tag or date_range or n_clicks:
+        if len(source) == 0:
+            return html.Div(id="pagination")
+
         min_max_date = DBConnector.get_min_max_dates(engine, DBConnector.TABLE)
-        if tag != "All" or min_max_date != date_range or n_clicks or switch:
+        if source or tag != "All" or min_max_date != date_range or n_clicks or switch:
             DBConnector.create_view(
                 engine,
                 DBConnector.TABLE,
@@ -33,39 +39,53 @@ def create_content(tag, date_range, n_clicks, switch, query):
                 date_range,
                 query,
                 switch,
+                source,
             )
             DBConnector.TABLE_VIEW = DBConnector.VIEW
         else:
             DBConnector.TABLE_VIEW = DBConnector.TABLE
 
-        page = 1
         df = pd.DataFrame(DBConnector.group_by_month(engine, DBConnector.TABLE_VIEW))
-        max_page = DBConnector.get_total_rows_count(engine, DBConnector.TABLE_VIEW)
-        pagination = Layout.get_pagination(page, max_page, df)
-        return pagination
-    return html.Div(id="pagination")
+        stats_bar = Layout.get_stats(df)
+        args = DBConnector.get_first_n_rows(
+            engine,
+            DBConnector.TABLE_VIEW,
+            n=Layout.PAGES,
+            columns=[
+                DBCOLUMNS.rowid,
+                DBCOLUMNS.image,
+                DBCOLUMNS.title,
+                DBCOLUMNS.content,
+                DBCOLUMNS.tag,
+                DBCOLUMNS.archive,
+                DBCOLUMNS.date,
+                DBCOLUMNS.link,
+            ],
+        )
+        last_id = args[-1][0]
+        main_section = Layout.get_main_section(args)
+        return stats_bar, main_section, last_id
+    raise PreventUpdate
 
 
 @callback(
-    Output("main", "children"),
-    [Input("pagination", "page"), Input("left_side", "children")],
+    Output("main", "children", allow_duplicate=True),
+    Output("article_id", "value", allow_duplicate=True),
+    Input("next", "n_clicks"),
+    State("article_id", "value"),
+    prevent_initial_call=True,
 )
-def change_page(page, _):
-    if page:
-        page = min(
-            page,
-            int(
-                round(
-                    DBConnector.get_total_rows_count(engine, DBConnector.TABLE_VIEW) / 3
-                )
-            ),
-        )
-        page_border = (3 * page - 2, 3 * page)
-        args = DBConnector.get_n_rows(
+def next_page(clicks, id):
+    if clicks:
+        n = Layout.PAGES
+
+        args = DBConnector.get_next_n_rows(
             engine,
             DBConnector.TABLE_VIEW,
-            page_border,
+            id,
+            n,
             columns=[
+                DBCOLUMNS.rowid,
                 DBCOLUMNS.image,
                 DBCOLUMNS.title,
                 DBCOLUMNS.content,
@@ -76,16 +96,13 @@ def change_page(page, _):
             ],
         )
         if args:
-            return Layout.get_main_section(args)
-    return html.Div()
+            last_id = args[-1][0]
+            return Layout.get_main_section(args), last_id
+    raise PreventUpdate
 
 
-@callback(
-    Output("pagination", "page"),
-    Input("go_to_page", "n_clicks"),
-    State("page_id", "value"),
-)
-def go_to_page(clicks, page):
-    if clicks:
-        return page
+@callback(Output("source", "value"), Input("toggle", "checked"))
+def toggle_checkboxes(toggle):
+    if toggle is not None:
+        return [val.value for val in Archives] if toggle else []
     raise PreventUpdate

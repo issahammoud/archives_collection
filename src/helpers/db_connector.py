@@ -1,9 +1,9 @@
+import numpy as np
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy import (
     MetaData,
     Table,
     Column,
-    Integer,
     String,
     LargeBinary,
     DateTime,
@@ -36,14 +36,14 @@ class DBConnector:
             Table(
                 table,
                 metadata,
-                Column(DBCOLUMNS.rowid, Integer, nullable=False, autoincrement=True),
+                Column(DBCOLUMNS.rowid, String, nullable=False),
                 Column(DBCOLUMNS.date, DateTime, nullable=False),
                 Column(DBCOLUMNS.archive, String, nullable=False),
                 Column(DBCOLUMNS.image, LargeBinary, nullable=True),
                 Column(DBCOLUMNS.title, String, nullable=True),
                 Column(DBCOLUMNS.content, String, nullable=True),
                 Column(DBCOLUMNS.tag, String, nullable=True),
-                Column(DBCOLUMNS.link, String, nullable=True, unique=True),
+                Column(DBCOLUMNS.link, String, nullable=False, unique=True),
                 PrimaryKeyConstraint(DBCOLUMNS.rowid),
             )
 
@@ -73,7 +73,9 @@ class DBConnector:
             connection.commit()
 
     @staticmethod
-    def create_view(engine, table_name, view_name, tag, date_range, query, switch):
+    def create_view(
+        engine, table_name, view_name, tag, date_range, query, switch, source
+    ):
         min_date, max_date = date_range
         data = {"date_1": min_date, "date_2": max_date}
 
@@ -82,6 +84,9 @@ class DBConnector:
             condition = "AND TRIM(UPPER(tag)) = :tag_1 "
             data.update({"tag_1": tag.strip().upper()})
 
+        if source:
+            condition += f"AND {DBCOLUMNS.archive} IN :archives "
+            data.update({"archives": tuple(source)})
         if switch:
             condition += "AND image IS NOT NULL "
 
@@ -93,10 +98,11 @@ class DBConnector:
         with engine.connect() as connection:
             connection.execute(
                 text(
-                    f"CREATE OR REPLACE view {view_name} as (SELECT row_number() "
-                    f"OVER (ORDER BY date), * "
-                    f"FROM {table_name} WHERE date >= :date_1 "
-                    f"AND date <= :date_2 {condition})"
+                    f"CREATE OR REPLACE view {view_name} AS "
+                    f"(SELECT * FROM {table_name}"
+                    " WHERE date >= :date_1 "
+                    f"AND date <= :date_2 {condition} "
+                    f"ORDER BY date, {DBCOLUMNS.rowid})"
                 ),
                 data,
             )
@@ -116,41 +122,35 @@ class DBConnector:
             connection.commit()
 
     @staticmethod
-    def get_row(engine, table, id, columns=None, condition=None):
+    def get_first_n_rows(engine, table, n, columns):
         columns = ", ".join(columns) if columns else "*"
-        condition = "AND " + condition if condition else ""
 
-        rowid = (
-            "row_number"
-            if DBConnector.TABLE_VIEW == DBConnector.VIEW
-            else DBCOLUMNS.rowid
-        )
-        with engine.connect() as connection:
-            result = connection.execute(
-                text(f"SELECT {columns} FROM {table} WHERE {rowid} = :id {condition}"),
-                {"id": id},
-            )
-            row = result.fetchone()
-
-        return row
-
-    @staticmethod
-    def get_n_rows(engine, table, idx, columns=None, condition=None):
-        columns = ", ".join(columns) if columns else "*"
-        condition = "AND " + condition if condition else ""
-
-        rowid = (
-            "row_number"
-            if DBConnector.TABLE_VIEW == DBConnector.VIEW
-            else DBCOLUMNS.rowid
-        )
         with engine.connect() as connection:
             result = connection.execute(
                 text(
-                    f"SELECT {columns} FROM {table} WHERE {rowid} "
-                    f"BETWEEN :id_1 AND :id_2 {condition}"
+                    f"SELECT {columns} FROM "
+                    f"(SELECT {columns} FROM {table} ORDER BY date, {DBCOLUMNS.rowid}) "
+                    "AS sorted_table LIMIT :n"
                 ),
-                {"id_1": idx[0], "id_2": idx[1]},
+                {"id": id, "n": n},
+            )
+            rows = result.fetchall()
+
+        return rows
+
+    @staticmethod
+    def get_next_n_rows(engine, table, id, n, columns=None):
+        columns = ", ".join(columns) if columns else "*"
+
+        with engine.connect() as connection:
+            result = connection.execute(
+                text(
+                    f"SELECT {columns} FROM "
+                    f"(SELECT {columns} FROM {table} ORDER BY date, {DBCOLUMNS.rowid}) "
+                    "AS sorted_table "
+                    f"WHERE {DBCOLUMNS.rowid} > :id  LIMIT :n"
+                ),
+                {"id": id, "n": n},
             )
             rows = result.fetchall()
 
@@ -161,7 +161,7 @@ class DBConnector:
         columns = ", ".join(columns) if columns else "*"
         with engine.connect() as connection:
             result = connection.execute(
-                text(f"SELECT {columns} FROM {table}"),
+                text(f"SELECT {columns} FROM {table} ORDER BY date, {DBCOLUMNS.rowid}"),
             )
             rows = result.fetchall()
 
@@ -203,6 +203,19 @@ class DBConnector:
             count = result.fetchone()[0]
 
         return count
+
+    @staticmethod
+    def get_archive_freq(engine, table):
+        with engine.connect() as connection:
+            result = connection.execute(
+                text(
+                    f"SELECT archive, COUNT(*) FROM {table} "
+                    "GROUP BY archive ORDER BY COUNT(*) DESC"
+                )
+            )
+            rows = result.fetchall()
+
+        return np.array(rows)
 
     @staticmethod
     def insert_row(engine, table, kwargs):
@@ -247,18 +260,6 @@ class DBConnector:
         return dates
 
     @staticmethod
-    def get_count(engine, table, archive):
-        with engine.connect() as connection:
-            result = connection.execute(
-                text(
-                    f"SELECT COUNT(*) FROM {table} WHERE {DBCOLUMNS.archive}=:archive"
-                ),
-                {"archive": archive},
-            )
-            dates = result.fetchone()[0]
-        return dates
-
-    @staticmethod
     def get_total_rows_count(engine, table):
         with engine.connect() as connection:
             result = connection.execute(text(f"SELECT COUNT(*) FROM {table}"))
@@ -267,16 +268,11 @@ class DBConnector:
 
     @staticmethod
     def group_by_month(engine, table):
-        rowid = (
-            "row_number"
-            if DBConnector.TABLE_VIEW == DBConnector.VIEW
-            else DBCOLUMNS.rowid
-        )
         with engine.connect() as connection:
             result = connection.execute(
                 text(
                     f"SELECT DATE_TRUNC('month', {DBCOLUMNS.date}) AS month, "
-                    f"COUNT({rowid}) AS COUNT FROM {table} GROUP BY month "
+                    f"COUNT({DBCOLUMNS.rowid}) AS COUNT FROM {table} GROUP BY month "
                     "ORDER BY month"
                 ),
             )

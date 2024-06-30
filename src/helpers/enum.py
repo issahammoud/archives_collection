@@ -10,6 +10,7 @@ class Archives(str, Enum):
     liberation = "liberation"
     mediapart = "mediapart"
     leparisien = "leparisien"
+    lhumanite = "lhumanite"
 
 
 class DBCOLUMNS(str, Enum):

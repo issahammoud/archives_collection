@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 class Decorator(DataCollector):
     def __init__(self, collector):
         self._collector = collector
+        self.__dict__.update(collector.__dict__)
         super().__init__(
             collector.url_format,
             collector.date2str,
@@ -17,8 +18,6 @@ class Decorator(DataCollector):
             collector.end_date,
             collector.timeout,
         )
-
-        self.__dict__.update(collector.__dict__)
 
     def get_all_url(self, archive):
         return self._collector.get_all_url(archive)
@@ -42,7 +41,9 @@ class AddPages(Decorator):
             content = self._collector.get_url_content(url)
             parsed_content = BeautifulSoup(content, "html.parser")
             selected = parsed_content.select(self._collector.page_selector)
-            pages = [int(el.text) for el in selected if el.text.isnumeric()]
+            pages = [
+                int(el.text.strip()) for el in selected if el.text.strip().isnumeric()
+            ]
             return max(pages) if pages else 1
         except Exception as e:
             logger.debug(e)
@@ -60,6 +61,13 @@ class AddPages(Decorator):
                 if page + 1 == 1:
                     new_urls.append((date, url))
                 else:
-                    new_urls.append((date, os.path.join(url, f"?page={page + 1}")))
+                    new_urls.append(
+                        (
+                            date,
+                            os.path.join(
+                                url, self._collector.page_url_suffix.format(page + 1)
+                            ),
+                        )
+                    )
 
         return new_urls

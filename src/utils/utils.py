@@ -1,3 +1,4 @@
+import hashlib
 import itertools
 import numpy as np
 
@@ -12,3 +13,7 @@ def alternate_elements(list_of_list):
     col_1 = col_1[np.where(col_1 != pad_token[0])]
     col_2 = col_2[np.where(col_2 != pad_token[1])]
     return list(zip(col_1, col_2))
+
+
+def hash_url(url):
+    return hashlib.sha256(url.encode("utf-8")).hexdigest()
