@@ -53,6 +53,5 @@ docs/_build/
 miniconda/
 onnx/
 *.ipynb
-*.txt
 *.png
 *env/

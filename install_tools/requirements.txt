@@ -1,0 +1,17 @@
+ipykernel==6.29
+numpy==1.26
+matplotlib==3.8
+pandas==2.1
+scikit-learn==1.3
+seaborn==0.12
+jupyter==1.0
+tqdm==4.66
+gunicorn==21.2
+dash==2.15
+dash-mantine-components==0.14
+dash-iconify==0.1.2
+SQLAlchemy==2.0.29
+opencv-python==4.9.0.80
+psycopg2-binary==2.9.9
+pre-commit==3.7
+dateparser==1.2.0
