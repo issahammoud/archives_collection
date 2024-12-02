@@ -1,14 +1,16 @@
-import numpy as np
-from sqlalchemy import create_engine, text, inspect
 from sqlalchemy import (
+    create_engine,
     MetaData,
     Table,
     Column,
-    String,
-    LargeBinary,
-    DateTime,
+    select,
+    func,
+    text,
+    Index,
     PrimaryKeyConstraint,
 )
+from sqlalchemy.sql import and_
+from sqlalchemy.types import String, DateTime, LargeBinary
 
 from src.helpers.enum import DBCOLUMNS
 
@@ -16,42 +18,54 @@ from src.helpers.enum import DBCOLUMNS
 class DBConnector:
     DBNAME = "postgresql:///archives"
     TABLE = "sections"
-    VIEW = "filtered_sections"
-    TABLE_VIEW = None
+
+    operator_map = {
+        "eq": lambda column, value: column == value,
+        "gt": lambda column, value: column > value,
+        "lt": lambda column, value: column < value,
+        "ge": lambda column, value: column >= value,
+        "le": lambda column, value: column <= value,
+        "in": lambda column, value: column.in_(value),
+        "like": lambda column, value: column.like(value),
+        "notnull": lambda column, value: column.isnot(None),
+    }
 
     @staticmethod
-    def get_engine(db_name, echo=False):
-        engine = create_engine(db_name, echo=echo)
-        return engine
-
-    @staticmethod
-    def has_table_or_view(engine, table):
-        return inspect(engine).has_table(table)
+    def get_engine(db_name=None, echo=False):
+        db_name = db_name or DBConnector.DBNAME
+        return create_engine(db_name, echo=echo)
 
     @staticmethod
     def create_table(engine, table):
-        if not DBConnector.has_table_or_view(engine, table):
+        if not DBConnector.has_table(engine, table):
             metadata = MetaData()
 
-            Table(
+            table_ref = Table(
                 table,
                 metadata,
-                Column(DBCOLUMNS.rowid, String, nullable=False),
-                Column(DBCOLUMNS.date, DateTime, nullable=False),
-                Column(DBCOLUMNS.archive, String, nullable=False),
-                Column(DBCOLUMNS.image, LargeBinary, nullable=True),
-                Column(DBCOLUMNS.title, String, nullable=True),
-                Column(DBCOLUMNS.content, String, nullable=True),
-                Column(DBCOLUMNS.tag, String, nullable=True),
-                Column(DBCOLUMNS.link, String, nullable=False, unique=True),
-                PrimaryKeyConstraint(DBCOLUMNS.rowid),
+                Column(DBCOLUMNS.rowid.value, String, nullable=False),
+                Column(DBCOLUMNS.date.value, DateTime, nullable=False),
+                Column(DBCOLUMNS.archive.value, String, nullable=False),
+                Column(DBCOLUMNS.image.value, LargeBinary, nullable=True),
+                Column(DBCOLUMNS.title.value, String, nullable=True),
+                Column(DBCOLUMNS.content.value, String, nullable=True),
+                Column(DBCOLUMNS.tag.value, String, nullable=True),
+                Column(DBCOLUMNS.link.value, String, nullable=False, unique=True),
+                PrimaryKeyConstraint(DBCOLUMNS.rowid.value),
             )
 
             metadata.create_all(engine)
 
-            DBConnector.add_searchable_column(
-                engine, DBConnector.TABLE, DBCOLUMNS.text_searchable
-            )
+            index = Index("idx_date", table_ref.c.date)
+            index.create(engine)
+
+            DBConnector.add_searchable_column(engine, table, DBCOLUMNS.text_searchable)
+
+    @staticmethod
+    def has_table(engine, table):
+        metadata = MetaData()
+        metadata.reflect(bind=engine)
+        return table in metadata.tables
 
     @staticmethod
     def add_searchable_column(engine, table, column_name):
@@ -60,9 +74,9 @@ class DBConnector:
                 text(
                     f"ALTER TABLE {table} ADD COLUMN {column_name} tsvector "
                     "GENERATED ALWAYS AS "
-                    f"(to_tsvector('french', coalesce({DBCOLUMNS.title}, "
-                    f"'') || ' ' || coalesce({DBCOLUMNS.content}, ''))) STORED"
-                ),
+                    "(to_tsvector('french', coalesce(title, '') "
+                    "|| ' ' || coalesce(content, ''))) STORED"
+                )
             )
             connection.execute(
                 text(
@@ -70,211 +84,209 @@ class DBConnector:
                     f"USING GIN ({column_name})"
                 )
             )
-            connection.commit()
 
     @staticmethod
-    def create_view(
-        engine, table_name, view_name, tag, date_range, query, switch, source
+    def apply_filters(query, table_ref, filters):
+        if filters:
+            for column, condition in filters.items():
+                column_ref = getattr(table_ref.c, column)
+
+                if isinstance(condition, tuple):
+                    operator, value = condition
+                    if operator in DBConnector.operator_map:
+                        query = query.where(
+                            DBConnector.operator_map[operator](column_ref, value)
+                        )
+                    else:
+                        raise ValueError(f"Unsupported operator {operator}")
+                else:
+                    query = query.where(column_ref == condition)
+        return query
+
+    @staticmethod
+    def get_done_dates(engine, table, archive, filters=None):
+        metadata = MetaData()
+        table_ref = Table(table, metadata, autoload_with=engine)
+
+        with engine.connect() as connection:
+            query = select(table_ref.c.date).where(table_ref.c.archive == archive)
+
+            query = DBConnector.apply_filters(query, table_ref, filters)
+
+            query = query.distinct()
+
+            result = connection.execute(query)
+            return [row[0] for row in result]
+
+    @staticmethod
+    def get_archive_rows(engine, table, archive, columns=None, filters=None):
+        metadata = MetaData()
+        table_ref = Table(table, metadata, autoload_with=engine)
+        columns = columns if columns else list(DBCOLUMNS)
+
+        with engine.connect() as connection:
+            query = select(
+                *(table_ref.c[col] for col in columns) if columns else table_ref
+            ).where(table_ref.c.archive == archive)
+            query = DBConnector.apply_filters(query, table_ref, filters)
+            result = connection.execute(query)
+            return result.fetchall()
+
+    @staticmethod
+    def get_archive_count(engine, table, archive, filters=None):
+        metadata = MetaData()
+        table_ref = Table(table, metadata, autoload_with=engine)
+
+        with engine.connect() as connection:
+            query = select(func.count()).where(table_ref.c.archive == archive)
+            query = DBConnector.apply_filters(query, table_ref, filters)
+            result = connection.execute(query)
+            return result.scalar()
+
+    @staticmethod
+    def get_archive_freq(engine, table, filters=None):
+        metadata = MetaData()
+        table_ref = Table(table, metadata, autoload_with=engine)
+
+        with engine.connect() as connection:
+            query = select(table_ref.c.archive, func.count())
+            query = DBConnector.apply_filters(query, table_ref, filters)
+            query = query.group_by(table_ref.c.archive).order_by(func.count().desc())
+            result = connection.execute(query)
+            return result.fetchall()
+
+    @staticmethod
+    def get_tags(engine, table, filters=None):
+        metadata = MetaData()
+        table_ref = Table(table, metadata, autoload_with=engine)
+
+        with engine.connect() as connection:
+            query = select(
+                func.trim(func.upper(table_ref.c.tag)).label("tag"),
+                func.count().label("count"),
+            )
+            query = DBConnector.apply_filters(query, table_ref, filters)
+
+            query = (
+                query.group_by(func.trim(func.upper(table_ref.c.tag)))
+                .order_by(func.count().desc())
+                .limit(100)
+            )
+            result = connection.execute(query)
+            return [row.tag for row in result]
+
+    @staticmethod
+    def fetch_data_keyset(
+        engine,
+        table,
+        primary_key_column,
+        last_seen_value=None,
+        direction="asc",
+        columns=None,
+        limit=10,
+        filters=None,
     ):
-        min_date, max_date = date_range
-        data = {"date_1": min_date, "date_2": max_date}
+        metadata = MetaData()
+        table_ref = Table(table, metadata, autoload_with=engine)
 
-        condition = ""
-        if tag and tag != "All":
-            condition = "AND TRIM(UPPER(tag)) = :tag_1 "
-            data.update({"tag_1": tag.strip().upper()})
+        order_by_clause = [
+            table_ref.c.date.asc() if direction == "asc" else table_ref.c.date.desc(),
+            (
+                table_ref.c[primary_key_column].asc()
+                if direction == "asc"
+                else table_ref.c[primary_key_column].desc()
+            ),
+        ]
 
-        if source:
-            condition += f"AND {DBCOLUMNS.archive} IN :archives "
-            data.update({"archives": tuple(source)})
-        if switch:
-            condition += "AND image IS NOT NULL "
+        query = select([table_ref.c[col] for col in columns] if columns else table_ref)
 
-        if query:
-            query = query = " & ".join(query.split())
-            condition += f"AND {DBCOLUMNS.text_searchable} @@ to_tsquery(:query)"
-            data.update({"query": query})
+        query = DBConnector.apply_filters(query, table_ref, filters)
 
-        with engine.connect() as connection:
-            connection.execute(
-                text(
-                    f"CREATE OR REPLACE view {view_name} AS "
-                    f"(SELECT * FROM {table_name}"
-                    " WHERE date >= :date_1 "
-                    f"AND date <= :date_2 {condition} "
-                    f"ORDER BY date, {DBCOLUMNS.rowid})"
-                ),
-                data,
-            )
-
-            connection.commit()
-
-    @staticmethod
-    def drop_table(engine, table):
-        with engine.connect() as connection:
-            connection.execute(text(f"DROP TABLE {table}"))
-            connection.commit()
-
-    @staticmethod
-    def drop_view(engine, view):
-        with engine.connect() as connection:
-            connection.execute(text(f"DROP VIEW {view}"))
-            connection.commit()
-
-    @staticmethod
-    def get_first_n_rows(engine, table, n, columns):
-        columns = ", ".join(columns) if columns else "*"
-
-        with engine.connect() as connection:
-            result = connection.execute(
-                text(
-                    f"SELECT {columns} FROM "
-                    f"(SELECT {columns} FROM {table} ORDER BY date, {DBCOLUMNS.rowid}) "
-                    "AS sorted_table LIMIT :n"
-                ),
-                {"id": id, "n": n},
-            )
-            rows = result.fetchall()
-
-        return rows
-
-    @staticmethod
-    def get_next_n_rows(engine, table, id, n, columns=None):
-        columns = ", ".join(columns) if columns else "*"
-
-        with engine.connect() as connection:
-            result = connection.execute(
-                text(
-                    f"SELECT {columns} FROM "
-                    f"(SELECT {columns} FROM {table} ORDER BY date, {DBCOLUMNS.rowid}) "
-                    "AS sorted_table "
-                    f"WHERE {DBCOLUMNS.rowid} > :id  LIMIT :n"
-                ),
-                {"id": id, "n": n},
-            )
-            rows = result.fetchall()
-
-        return rows
-
-    @staticmethod
-    def get_all_rows(engine, table, columns=None):
-        columns = ", ".join(columns) if columns else "*"
-        with engine.connect() as connection:
-            result = connection.execute(
-                text(f"SELECT {columns} FROM {table} ORDER BY date, {DBCOLUMNS.rowid}"),
-            )
-            rows = result.fetchall()
-
-        return rows
-
-    @staticmethod
-    def get_tags(engine, table):
-        with engine.connect() as connection:
-            result = connection.execute(
-                text(
-                    f"SELECT TRIM(UPPER({DBCOLUMNS.tag})) FROM {table} "
-                    f"GROUP BY TRIM(UPPER({DBCOLUMNS.tag})) "
-                    "ORDER BY COUNT(*) DESC limit 100"
+        if last_seen_value:
+            query = query.where(
+                (table_ref.c.date > last_seen_value["date"])
+                | (
+                    and_(
+                        table_ref.c.date == last_seen_value["date"],
+                        table_ref.c[primary_key_column]
+                        > last_seen_value[primary_key_column],
+                    )
                 )
             )
-            rows = result.fetchall()
 
-        return rows
+        query = query.order_by(*order_by_clause).limit(limit)
+
+        with engine.connect() as connection:
+            result = connection.execute(query)
+
+        return result.fetchall()
 
     @staticmethod
-    def get_archive_rows(engine, table, archive, columns=None):
-        columns = ", ".join(columns) if columns else "*"
-        with engine.connect() as connection:
-            result = connection.execute(
-                text(f"SELECT {columns} FROM {table} WHERE archive = :arx"),
-                {"arx": archive},
-            )
-            rows = result.fetchall()
+    def group_by_month(engine, table, filters=None):
+        metadata = MetaData()
+        table_ref = Table(table, metadata, autoload_with=engine)
 
-        return rows
+        with engine.connect() as connection:
+            query = select(
+                func.date_trunc("month", table_ref.c.date).label("month"),
+                func.count(table_ref.c.rowid).label("count"),
+            )
+            query = DBConnector.apply_filters(query, table_ref, filters)
+            query = query.group_by(func.date_trunc("month", table_ref.c.date)).order_by(
+                func.date_trunc("month", table_ref.c.date)
+            )
+
+            result = connection.execute(query)
+            return result.fetchall()
 
     @staticmethod
-    def get_archive_count(engine, table, archive):
+    def get_min_max_dates(engine, table, filters=None):
+        metadata = MetaData()
+        table_ref = Table(table, metadata, autoload_with=engine)
+
         with engine.connect() as connection:
-            result = connection.execute(
-                text(f"SELECT COUNT(*) FROM {table} WHERE archive = :arx"),
-                {"arx": archive},
-            )
-            count = result.fetchone()[0]
+            query = select(func.min(table_ref.c.date), func.max(table_ref.c.date))
 
-        return count
+            query = DBConnector.apply_filters(query, table_ref, filters)
 
-    @staticmethod
-    def get_archive_freq(engine, table):
-        with engine.connect() as connection:
-            result = connection.execute(
-                text(
-                    f"SELECT archive, COUNT(*) FROM {table} "
-                    "GROUP BY archive ORDER BY COUNT(*) DESC"
-                )
-            )
-            rows = result.fetchall()
+            result = connection.execute(query)
+            min_date, max_date = result.fetchone()
 
-        return np.array(rows)
+            return [min_date, max_date]
 
     @staticmethod
     def insert_row(engine, table, kwargs):
-        with engine.connect() as connection:
-            keys = list(kwargs.keys())
-            placeholders = [":" + key for key in keys]
+        metadata = MetaData()
+        table_ref = Table(table, metadata, autoload_with=engine)
 
-            insert_query = (
-                f"INSERT INTO {table} "
-                f"({', '.join(keys)}) "
-                f"VALUES({', '.join(placeholders)}) "
-                "ON CONFLICT DO NOTHING"
-            )
-            connection.execute(text(insert_query), kwargs)
+        insert_stmt = table_ref.insert().values(**kwargs)
+
+        if "postgresql" in str(engine.url):
+            from sqlalchemy.dialects.postgresql import insert
+
+            insert_stmt = insert(table_ref).values(**kwargs).on_conflict_do_nothing()
+
+        with engine.connect() as connection:
+            connection.execute(insert_stmt)
             connection.commit()
 
     @staticmethod
-    def get_min_max_dates(engine, table):
+    def delete_row(engine, table, condition):
+        metadata = MetaData()
+        table_ref = Table(table, metadata, autoload_with=engine)
+
+        delete_query = table_ref.delete().where(
+            *[getattr(table_ref.c, key) == value for key, value in condition.items()]
+        )
+
         with engine.connect() as connection:
-            result = connection.execute(
-                text(f"SELECT MIN(date) FROM {table}"),
-            )
-            min_date = result.fetchone()[0]
-
-            result = connection.execute(
-                text(f"SELECT MAX(date) FROM {table}"),
-            )
-            max_date = result.fetchone()[0]
-
-        return [min_date.date(), max_date.date()]
+            connection.execute(delete_query)
+            connection.commit()
 
     @staticmethod
-    def get_done_dates(engine, table, archive):
-        with engine.connect() as connection:
-            result = connection.execute(
-                text(
-                    f"SELECT DISTINCT date FROM {table} WHERE {DBCOLUMNS.archive}=:arx"
-                ),
-                {"arx": archive},
-            )
-            dates = result.fetchall()
-        return dates
+    def drop_table(engine, table_name):
+        metadata = MetaData()
+        table_ref = Table(table_name, metadata, autoload_with=engine)
 
-    @staticmethod
-    def get_total_rows_count(engine, table):
-        with engine.connect() as connection:
-            result = connection.execute(text(f"SELECT COUNT(*) FROM {table}"))
-            dates = result.fetchone()[0]
-        return dates
-
-    @staticmethod
-    def group_by_month(engine, table):
-        with engine.connect() as connection:
-            result = connection.execute(
-                text(
-                    f"SELECT DATE_TRUNC('month', {DBCOLUMNS.date}) AS month, "
-                    f"COUNT({DBCOLUMNS.rowid}) AS COUNT FROM {table} GROUP BY month "
-                    "ORDER BY month"
-                ),
-            )
-            rows = result.fetchall()
-        return rows
+        table_ref.drop(engine)
+        print(f"Table '{table_name}' has been dropped.")
