@@ -8,7 +8,7 @@ jupyter==1.0
 tqdm==4.66
 gunicorn==21.2
 dash==2.15
-dash-mantine-components==0.14
+dash-mantine-components==0.15
 dash-iconify==0.1.2
 SQLAlchemy==2.0.29
 opencv-python==4.9.0.80

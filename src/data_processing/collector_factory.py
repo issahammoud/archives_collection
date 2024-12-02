@@ -49,7 +49,7 @@ class CollectorFactory:
                 name in CollectorFactory.MAPPING
             ), f"Unknown collector {name}. Should be one of {Archives}"
             collector = CollectorFactory.MAPPING[name](**kwargs)
-            if name in [Archives.lesechos, Archives.ouestfrance, Archives.lhumanite]:
+            if collector.has_multiple_pages:
                 collector = AddPages(collector)
             self.collectors.append(collector)
 

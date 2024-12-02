@@ -14,7 +14,7 @@ from src.helpers.enum import DBCOLUMNS
 
 
 class DBConnector:
-    DBNAME = "postgresql://issahammoud:allahma123@localhost:5432/lemonde"
+    DBNAME = "postgresql:///archives"
     TABLE = "sections"
     VIEW = "filtered_sections"
     TABLE_VIEW = None

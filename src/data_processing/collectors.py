@@ -17,7 +17,7 @@ class LeMonde(DataCollector):
         self.content_selector = "section#river > section.teaser"
         self.min_date = datetime.strptime("19-12-1944", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="dd-MM-Y")
-
+        self.has_multiple_pages = False
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
@@ -50,6 +50,7 @@ class LeFigaro(DataCollector):
         self.content_selector = "#articles-list > article"
         self.min_date = datetime.strptime("01-01-2005", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="dd-MM-Y")
+        self.has_multiple_pages = False
 
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
@@ -83,6 +84,8 @@ class LesEchos(DataCollector):
         self.page_url_suffix = "?page={}"
         self.min_date = datetime.strptime("01-01-1991", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y/MM")
+
+        self.has_multiple_pages = True
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
@@ -116,6 +119,7 @@ class VingthMinutes(DataCollector):
         self.content_selector = "section > div > ul > li"
         self.min_date = datetime.strptime("01-01-2006", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y/MM-dd")
+        self.has_multiple_pages = False
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
@@ -153,6 +157,7 @@ class OuestFrance(DataCollector):
         self.page_url_suffix = "?page={}"
         self.min_date = datetime.strptime("01-01-2006", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y/dd-MMMM-Y", locale="fr")
+        self.has_multiple_pages = True
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
@@ -191,6 +196,7 @@ class Liberation(DataCollector):
         self.content_selector = "main article"
         self.min_date = datetime.strptime("01-01-1998", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y/MM/dd")
+        self.has_multiple_pages = False
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
@@ -230,6 +236,7 @@ class Mediapart(DataCollector):
         self.content_selector = "section"
         self.min_date = datetime.strptime("01-01-2009", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="ddMMYY")
+        self.has_multiple_pages = False
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
@@ -261,6 +268,7 @@ class LeParisien(DataCollector):
         self.content_selector = "#top div > div > a"
         self.min_date = datetime.strptime("01-04-2009", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y/dd-MM-Y")
+        self.has_multiple_pages = False
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
@@ -300,6 +308,7 @@ class LHumanite(DataCollector):
         self.page_url_suffix = "&page={}"
         self.min_date = datetime.strptime("01-01-1998", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y-MM-dd")
+        self.has_multiple_pages = True
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
