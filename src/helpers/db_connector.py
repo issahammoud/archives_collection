@@ -198,7 +198,7 @@ class DBConnector:
             ),
         ]
 
-        query = select([table_ref.c[col] for col in columns] if columns else table_ref)
+        query = select(*[table_ref.c[col] for col in columns] if columns else table_ref)
 
         query = DBConnector.apply_filters(query, table_ref, filters)
 

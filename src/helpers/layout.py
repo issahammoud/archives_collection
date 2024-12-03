@@ -13,7 +13,7 @@ engine = DBConnector.get_engine(DBConnector.DBNAME)
 
 
 class Graph:
-    def get_graph(df, range_date):
+    def get_graph(df):
         layout = go.Layout(
             xaxis=dict(
                 autorange=True,
@@ -31,14 +31,14 @@ class Graph:
             x="month",
             y="count",
             hover_data={"month": "|%B %d, %Y"},
-            range_x=range_date,
         )
         fig.update_layout(layout)
         fig.update_layout(yaxis_title=None)
         fig.update_layout(xaxis_title=None)
+        fig.update_traces(marker_color="#0097b2")
         graph = dcc.Graph(
             figure=fig,
-            style={"height": 50},
+            style={"height": 60},
             config={"displaylogo": False, "displayModeBar": False},
         )
         return graph
@@ -53,16 +53,43 @@ class Layout:
         src = "data:image/png;base64,{}".format(
             base64.b64encode(byte_img).decode("ascii")
         )
+        enroll_btn = Layout.get_enroll_btn()
         header = dmc.Grid(
             [
                 dmc.GridCol(
                     html.Div(dmc.Image(fallbackSrc=src), style={"width": 120}), span=2
-                )
+                ),
+                dmc.GridCol(enroll_btn, span=1, offset=9),
             ],
             align="center",
             justify="flex-start",
         )
         return header
+
+    @staticmethod
+    def get_enroll_btn():
+        link = "https://intuitive-dl.thinkific.com/courses/intuitive-dl"
+
+        button = dmc.Button(
+            dmc.Text("Enroll Now", c="#0097b2", fw=300),
+            color="#ff5757",
+            variant="outline",
+        )
+        tooltip = dmc.Tooltip(
+            button,
+            label="Enroll in Intuitive Deep Learning course for free",
+            multiline=True,
+            withArrow=True,
+            openDelay=3,
+            position="bottom",
+        )
+        a = html.A(
+            children=tooltip,
+            href=link,
+            target="_blank",
+            style={"textDecoration": "none"},
+        )
+        return a
 
     @staticmethod
     def filter_by_text():
@@ -121,7 +148,7 @@ class Layout:
     @staticmethod
     def filter_by_tag():
         tags = DBConnector.get_tags(engine, DBConnector.TABLE)
-        tags = ["All"] + [tag[0].title() for tag in tags if tag[0]]
+        tags = ["All"] + [tag.title() for tag in tags if tag]
 
         select = dmc.Select(
             id="tag",
@@ -144,15 +171,16 @@ class Layout:
         tag = Layout.filter_by_tag()
         text = Layout.filter_by_text()
         archives = Layout.filter_by_archive()
-        return dmc.Box(
+        return dmc.Paper(
             dmc.Stack(
                 [date, tag, text, archives],
                 align="stretch",
                 justify="space-between",
                 gap="xl",
             ),
-            mt=8,
             p=20,
+            shadow="xs",
+            h="100%",
         )
 
     @staticmethod
@@ -160,10 +188,7 @@ class Layout:
         stats_bar = dmc.Grid(
             [
                 dmc.GridCol(
-                    Graph.get_graph(
-                        df,
-                        DBConnector.get_min_max_dates(engine, DBConnector.TABLE),
-                    ),
+                    Graph.get_graph(df),
                     span=12,
                 ),
             ],
@@ -173,7 +198,7 @@ class Layout:
         return stats_bar
 
     @staticmethod
-    def get_card(rowid, byte_img, title, content, tag, archive, date, link):
+    def get_card(byte_img, title, content, tag, archive, date, link):
         src = (
             "data:image/png;base64,{}".format(base64.b64encode(byte_img).decode())
             if byte_img
@@ -188,78 +213,86 @@ class Layout:
                 dmc.CardSection(
                     dmc.Group(
                         [
-                            dmc.Text(archive, fw=700),
-                            dmc.Text(date, td="italic", fw=400),
+                            dmc.Text(archive, fw=600),
+                            dmc.Text(date, fs="italic", fw=300, ta="right"),
                         ],
                         grow=True,
+                        justify="space-around",
                     ),
                     withBorder=True,
                     inheritPadding=True,
-                    py="xs",
+                    py="sm",
                 ),
                 dmc.CardSection(
-                    dmc.Image(
-                        fallbackSrc=src,
-                        h=300,
-                    ),
+                    dmc.Image(fallbackSrc=src, radius=2, h=300),
+                    withBorder=True,
                     mb=10,
                 ),
-                dmc.Stack(
+                dmc.CardSection(
                     [
-                        dmc.Tooltip(
-                            dmc.Text(title, fw=500, size="md", truncate=True),
-                            label=title,
-                            multiline=True,
-                            withArrow=True,
-                            openDelay=3,
-                        ),
-                        dmc.Blockquote(
-                            dmc.ScrollArea(
-                                dmc.Text(
-                                    content,
-                                    size="sm",
-                                    style={
-                                        "verticalAlign": "top",
-                                        "textAlign": "justify",
-                                    },
+                        dmc.Stack(
+                            [
+                                dmc.Tooltip(
+                                    dmc.Text(
+                                        title,
+                                        fw=500,
+                                        size="md",
+                                        truncate=True,
+                                        lineClamp=1,
+                                        ta="left",
+                                    ),
+                                    label=title,
+                                    multiline=True,
+                                    withArrow=True,
+                                    openDelay=3,
+                                    position="top-start",
                                 ),
-                                type="hover",
-                                offsetScrollbars=True,
-                                h=150,
-                                scrollbarSize=4,
-                            ),
-                            color="#0097b2",
-                            radius="sm",
-                            icon=DashIconify(
-                                icon="teenyicons:quote-solid",
-                                width=25,
-                                color="#ff5757",
-                                style={
-                                    "position": "absolute",
-                                    "top": 25,
-                                    "left": 30,
-                                    "zIndex": 1,
-                                },
-                            ),
-                            style={
-                                "height": 150,
-                                "background": "white",
-                            },
-                        ),
-                        dmc.CardSection(
-                            dmc.Text(
-                                tag, size="sm", c="dimmed", fs="italic", ta="left"
-                            ),
-                            pb=10,
-                            pl=20,
-                        ),
-                    ]
+                                dmc.Blockquote(
+                                    dmc.ScrollArea(
+                                        dmc.Text(content, size="sm", ta="justify"),
+                                        type="hover",
+                                        offsetScrollbars=True,
+                                        scrollbarSize=4,
+                                        h=120,
+                                    ),
+                                    color="#0097b2",
+                                    radius=6,
+                                    iconSize=40,
+                                    p="md",
+                                    h=150,
+                                    icon=DashIconify(
+                                        icon="material-symbols:format-quote-rounded",
+                                        width=20,
+                                        color="#ff5757",
+                                        style={
+                                            "position": "absolute",
+                                            "top": 20,
+                                            "left": 20,
+                                            "zIndex": 1,
+                                            "transform": "scaleY(-1) scaleX(-1)",
+                                        },
+                                    ),
+                                ),
+                                dmc.Box(
+                                    dmc.Text(
+                                        tag,
+                                        size="sm",
+                                        c="dimmed",
+                                        fs="italic",
+                                        ta="left",
+                                    ),
+                                    p=5,
+                                ),
+                            ]
+                        )
+                    ],
+                    withBorder=True,
+                    inheritPadding=True,
                 ),
             ],
             withBorder=True,
-            shadow="sm",
+            shadow="xs",
             radius="md",
-            style={"height": "100%", "width": "100%"},
         )
         return html.A(
             children=card, href=link, target="_blank", style={"textDecoration": "none"}
@@ -286,34 +319,17 @@ class Layout:
                 icon="material-symbols:navigate-before", color="#0097b2"
             ),
         )
-
-        return html.Div(carousel, style={"width": "100%"})
-
-    @staticmethod
-    def get_affix():
-        link = "https://intuitive-dl.thinkific.com/courses/intuitive-dl"
-
-        button = dmc.Button("Enroll Now!", color="#ff5757")
-        tooltip = dmc.Tooltip(
-            button,
-            label="Enroll in Intuitive Deep Learning course",
-            multiline=True,
-            withArrow=True,
-            openDelay=3,
-        )
-        a = html.A(
-            children=tooltip,
-            href=link,
-            target="_blank",
-            style={"textDecoration": "none"},
-        )
-        affix = dmc.Affix(a, position={"bottom": 20, "right": 20})
-        return affix
+        return carousel
 
     @staticmethod
     def get_footer():
         return dmc.Box(
-            dmc.Text("© Copyright Intuitive Deep Learning 2024", size="sm"), mt=8, p=24
+            dmc.Text(
+                "© Copyright Intuitive Deep Learning 2024. All rights reserved.",
+                size="sm",
+            ),
+            mt=8,
+            p=24,
         )
 
     @staticmethod
@@ -323,12 +339,17 @@ class Layout:
         df = pd.DataFrame(DBConnector.group_by_month(engine, DBConnector.TABLE))
         stats = Layout.get_stats(df)
 
-        args = DBConnector.get_first_n_rows(
+        args = DBConnector.fetch_data_keyset(
             engine,
             DBConnector.TABLE,
-            100,
+            DBCOLUMNS.rowid,
+            limit=100,
+            direction="desc",
+            filters={
+                DBCOLUMNS.image: ("notnull", None),
+                DBCOLUMNS.date: ("gt", datetime(2000, 1, 1)),
+            },
             columns=[
-                DBCOLUMNS.rowid,
                 DBCOLUMNS.image,
                 DBCOLUMNS.title,
                 DBCOLUMNS.content,
@@ -340,14 +361,12 @@ class Layout:
         )
         carousel = Layout.get_carousel(args)
 
-        main = dmc.Container(dmc.Stack([stats, carousel], gap="xl"), size="xl")
+        main = dmc.Stack([stats, carousel], gap="xl", align="stretch")
 
-        affix = Layout.get_affix()
         footer = Layout.get_footer()
 
         appshell = dmc.AppShell(
             [
-                affix,
                 dmc.AppShellHeader(
                     dmc.Container(
                         header,
@@ -356,18 +375,18 @@ class Layout:
                     withBorder=True,
                 ),
                 dmc.AppShellNavbar(
-                    dmc.Container(navbar, size="xl"),
-                    withBorder=True,
+                    navbar,
+                    withBorder=False,
                 ),
-                dmc.AppShellMain(dmc.Container(main, id="main", size="xl")),
-                dmc.AppShellFooter(dmc.Container(footer, size="xl"), withBorder=False),
+                dmc.AppShellMain(dmc.Container(main, id="main", size="xl", mt=30)),
+                dmc.AppShellFooter(footer, withBorder=False),
             ],
             header={"height": 120},
-            padding="xl",
             navbar={
-                "width": 300,
+                "width": 280,
                 "breakpoint": "sm",
                 "collapsed": {"mobile": True},
             },
+            footer={"height": 60},
         )
         return dmc.MantineProvider(appshell)
