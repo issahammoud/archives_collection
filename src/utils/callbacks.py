@@ -1,101 +1,168 @@
-# import pandas as pd
-# from dash.exceptions import PreventUpdate
-# from dash import Input, State, Output, callback, html
+import dash
+import pandas as pd
+from dash.exceptions import PreventUpdate
+from dash import Input, State, Output, callback
 
 
-# from src.helpers.layout import Layout
-# from src.helpers.enum import DBCOLUMNS, Archives
-# from src.helpers.db_connector import DBConnector
+from src.helpers.layout import Layout
+from src.helpers.enum import DBCOLUMNS
+from src.helpers.db_connector import DBConnector
 
 
-# engine = DBConnector.get_engine(DBConnector.DBNAME)
+engine = DBConnector.get_engine(DBConnector.DBNAME)
 
 
-# @callback(
-#     Output("stats_bar", "children"),
-#     Output("main", "children"),
-#     Output("article_id", "value"),
-#     [
-#         Input("source", "value"),
-#         Input("tag", "value"),
-#         Input("date", "value"),
-#         Input("filter_by_text", "n_clicks"),
-#         Input("switch", "checked"),
-#     ],
-#     State("query", "value"),
-# )
-# def create_content(source, tag, date_range, n_clicks, switch, query):
-#     if source or tag or date_range or n_clicks:
-#         if len(source) == 0:
-#             return html.Div(id="pagination")
+def get_filters_dict(archive, tag, date_range, text_clicks, null_clicks, query):
+    filters = {DBCOLUMNS.date: [("ge", date_range[0]), ("le", date_range[1])]}
 
-#         min_max_date = DBConnector.get_min_max_dates(engine, DBConnector.TABLE)
-#         if source or tag != "All" or min_max_date != date_range or n_clicks or switch:
-#             DBConnector.create_view(
-#                 engine,
-#                 DBConnector.TABLE,
-#                 DBConnector.VIEW,
-#                 tag,
-#                 date_range,
-#                 query,
-#                 switch,
-#                 source,
-#             )
-#             DBConnector.TABLE_VIEW = DBConnector.VIEW
-#         else:
-#             DBConnector.TABLE_VIEW = DBConnector.TABLE
+    filters.update({DBCOLUMNS.tag: [("eq", tag)]} if tag else {})
 
-#         df = pd.DataFrame(DBConnector.group_by_month(engine, DBConnector.TABLE_VIEW))
-#         stats_bar = Layout.get_stats(df)
-#         args = DBConnector.get_first_n_rows(
-#             engine,
-#             DBConnector.TABLE_VIEW,
-#             n=Layout.PAGES,
-#             columns=[
-#                 DBCOLUMNS.rowid,
-#                 DBCOLUMNS.image,
-#                 DBCOLUMNS.title,
-#                 DBCOLUMNS.content,
-#                 DBCOLUMNS.tag,
-#                 DBCOLUMNS.archive,
-#                 DBCOLUMNS.date,
-#                 DBCOLUMNS.link,
-#             ],
-#         )
-#         last_id = args[-1][0]
-#         main_section = Layout.get_main_section(args)
-#         return stats_bar, main_section, last_id
-#     raise PreventUpdate
+    filters.update({DBCOLUMNS.archive: [("in", archive)]} if archive else {})
+
+    filters.update(
+        {DBCOLUMNS.text_searchable: [("text_search", query)]}
+        if text_clicks and query
+        else {}
+    )
+
+    filters.update(
+        {DBCOLUMNS.image: [("notnull", None)]}
+        if null_clicks is not None and null_clicks % 2
+        else {}
+    )
+
+    return filters
 
 
-# @callback(
-#     Output("main", "children", allow_duplicate=True),
-#     Output("article_id", "value", allow_duplicate=True),
-#     Input("next", "n_clicks"),
-#     State("article_id", "value"),
-#     prevent_initial_call=True,
-# )
-# def next_page(clicks, id):
-#     if clicks:
-#         n = Layout.PAGES
+@callback(
+    Output("main", "children"),
+    Output("last_seen", "data"),
+    Input("archive", "value"),
+    Input("tag", "value"),
+    Input("date", "value"),
+    Input("text", "n_clicks"),
+    Input("asc_desc", "n_clicks"),
+    Input("null_img", "n_clicks"),
+    State("query", "value"),
+)
+def create_content(
+    archive, tag, date_range, text_clicks, sort_clicks, null_clicks, query
+):
+    filters = get_filters_dict(
+        archive, tag, date_range, text_clicks, null_clicks, query
+    )
 
-#         args = DBConnector.get_next_n_rows(
-#             engine,
-#             DBConnector.TABLE_VIEW,
-#             id,
-#             n,
-#             columns=[
-#                 DBCOLUMNS.rowid,
-#                 DBCOLUMNS.image,
-#                 DBCOLUMNS.title,
-#                 DBCOLUMNS.content,
-#                 DBCOLUMNS.tag,
-#                 DBCOLUMNS.archive,
-#                 DBCOLUMNS.date,
-#                 DBCOLUMNS.link,
-#             ],
-#         )
-#         if args:
-#             last_id = args[-1][0]
-#             return Layout.get_main_section(args), last_id
-#     raise PreventUpdate
+    df = pd.DataFrame(DBConnector.group_by_day(engine, DBConnector.TABLE, filters))
+    args = DBConnector.fetch_data_keyset(
+        engine,
+        DBConnector.TABLE,
+        limit=Layout.SLIDES * Layout.MAX_PAGES,
+        filters=filters,
+        columns=[
+            DBCOLUMNS.rowid,
+            DBCOLUMNS.image,
+            DBCOLUMNS.title,
+            DBCOLUMNS.content,
+            DBCOLUMNS.tag,
+            DBCOLUMNS.archive,
+            DBCOLUMNS.date,
+            DBCOLUMNS.link,
+        ],
+        flip_order=not (sort_clicks is not None and sort_clicks % 2),
+    )
+    data = {
+        DBCOLUMNS.date: args[-1 - Layout.SLIDES][-2],
+        DBCOLUMNS.rowid: args[-1 - Layout.SLIDES][0],
+        "direction": "forward",
+    }
+
+    return Layout.get_main(df, args), data
+
+
+@callback(
+    Output("carousel", "children"),
+    Output("carousel", "initialSlide"),
+    Output("last_seen", "data", allow_duplicate=True),
+    Output("previous_active", "data"),
+    Input("carousel", "active"),
+    State("previous_active", "data"),
+    State("last_seen", "data"),
+    State("archive", "value"),
+    State("tag", "value"),
+    State("date", "value"),
+    State("text", "n_clicks"),
+    State("query", "value"),
+    State("asc_desc", "n_clicks"),
+    State("null_img", "n_clicks"),
+    prevent_initial_call=True,
+)
+def update_carousel(
+    active,
+    previous_active,
+    last_seen,
+    archive,
+    tag,
+    date_range,
+    text_clicks,
+    query,
+    sort_clicks,
+    null_clicks,
+):
+
+    if active is not None:
+        filters = get_filters_dict(
+            archive, tag, date_range, text_clicks, null_clicks, query
+        )
+
+        direction = "forward" if active > previous_active else "backward"
+        last_seen["direction"] = direction
+
+        if direction == "forward" and active == Layout.MAX_PAGES - 1:
+
+            args = DBConnector.fetch_data_keyset(
+                engine,
+                DBConnector.TABLE,
+                limit=Layout.SLIDES * Layout.MAX_PAGES,
+                filters=filters,
+                last_seen_value=last_seen,
+                columns=[
+                    DBCOLUMNS.rowid,
+                    DBCOLUMNS.image,
+                    DBCOLUMNS.title,
+                    DBCOLUMNS.content,
+                    DBCOLUMNS.tag,
+                    DBCOLUMNS.archive,
+                    DBCOLUMNS.date,
+                    DBCOLUMNS.link,
+                ],
+                flip_order=not (sort_clicks is not None and sort_clicks % 2),
+            )
+            last_seen[DBCOLUMNS.date] = args[-1 - Layout.SLIDES][-2]
+            last_seen[DBCOLUMNS.rowid] = args[-1 - Layout.SLIDES][0]
+            return Layout.get_carousel_slides(args), 0, last_seen, 0
+
+        elif direction == "backward" and active == 0 and previous_active != 0:
+            args = DBConnector.fetch_data_keyset(
+                engine,
+                DBConnector.TABLE,
+                limit=Layout.SLIDES * Layout.MAX_PAGES,
+                filters=filters,
+                last_seen_value=last_seen,
+                columns=[
+                    DBCOLUMNS.rowid,
+                    DBCOLUMNS.image,
+                    DBCOLUMNS.title,
+                    DBCOLUMNS.content,
+                    DBCOLUMNS.tag,
+                    DBCOLUMNS.archive,
+                    DBCOLUMNS.date,
+                    DBCOLUMNS.link,
+                ],
+                flip_order=sort_clicks % 2,
+            )
+            last_seen[DBCOLUMNS.date] = args[0][-2]
+            last_seen[DBCOLUMNS.rowid] = args[0][0]
+            return Layout.get_carousel_slides(args), Layout.MAX_PAGES - 2, last_seen, 0
+        else:
+            return dash.no_update, active, last_seen, active
+    raise PreventUpdate

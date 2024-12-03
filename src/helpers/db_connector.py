@@ -27,7 +27,11 @@ class DBConnector:
         "le": lambda column, value: column <= value,
         "in": lambda column, value: column.in_(value),
         "like": lambda column, value: column.like(value),
-        "notnull": lambda column, value: column.isnot(None),
+        "notnull": lambda column, _: column.isnot(None),
+        "isnull": lambda col, _: col.is_(None),
+        "text_search": lambda col, value: text(
+            f"{col.name} @@ to_tsquery(:query)"
+        ).bindparams(query=" & ".join(value.split())),
     }
 
     @staticmethod
@@ -56,8 +60,19 @@ class DBConnector:
 
             metadata.create_all(engine)
 
-            index = Index("idx_date", table_ref.c.date)
-            index.create(engine)
+            index_asc = Index(
+                "idx_rowid_date_asc",
+                table_ref.c[DBCOLUMNS.rowid].asc(),
+                table_ref.c[DBCOLUMNS.date].asc(),
+            )
+            index_asc.create(bind=engine)
+
+            index_desc = Index(
+                "idx_rowid_date_desc",
+                table_ref.c[DBCOLUMNS.rowid].desc(),
+                table_ref.c[DBCOLUMNS.date].desc(),
+            )
+            index_desc.create(bind=engine)
 
             DBConnector.add_searchable_column(engine, table, DBCOLUMNS.text_searchable)
 
@@ -88,20 +103,36 @@ class DBConnector:
     @staticmethod
     def apply_filters(query, table_ref, filters):
         if filters:
-            for column, condition in filters.items():
-                column_ref = getattr(table_ref.c, column)
+            conditions = []
+            for column, ops in filters.items():
+                col = getattr(table_ref.c, column, None)
+                assert (
+                    col is not None
+                ), f"Column '{column}' does not exist in the table."
 
-                if isinstance(condition, tuple):
-                    operator, value = condition
-                    if operator in DBConnector.operator_map:
-                        query = query.where(
-                            DBConnector.operator_map[operator](column_ref, value)
-                        )
-                    else:
-                        raise ValueError(f"Unsupported operator {operator}")
-                else:
-                    query = query.where(column_ref == condition)
+                for op, value in ops:
+                    assert (
+                        op in DBConnector.operator_map
+                    ), f"Operator '{op}' is not supported."
+                    operator_func = DBConnector.operator_map.get(op)
+                    conditions.append(operator_func(col, value))
+
+                if conditions:
+                    query = query.where(and_(*conditions))
         return query
+
+    @staticmethod
+    def get_total_count(engine, table, filters=None):
+        metadata = MetaData()
+        table_ref = Table(table, metadata, autoload_with=engine)
+
+        with engine.connect() as connection:
+            query = select(func.count()).select_from(table_ref)
+
+            query = DBConnector.apply_filters(query, table_ref, filters)
+
+            total_count = connection.execute(query).scalar()
+        return total_count
 
     @staticmethod
     def get_done_dates(engine, table, archive, filters=None):
@@ -179,40 +210,55 @@ class DBConnector:
     def fetch_data_keyset(
         engine,
         table,
-        primary_key_column,
         last_seen_value=None,
-        direction="asc",
         columns=None,
         limit=10,
         filters=None,
+        flip_order=False,
     ):
         metadata = MetaData()
         table_ref = Table(table, metadata, autoload_with=engine)
 
-        order_by_clause = [
-            table_ref.c.date.asc() if direction == "asc" else table_ref.c.date.desc(),
-            (
-                table_ref.c[primary_key_column].asc()
-                if direction == "asc"
-                else table_ref.c[primary_key_column].desc()
-            ),
-        ]
+        if flip_order:
+            order_by_clause = [
+                table_ref.c[DBCOLUMNS.date].desc(),
+                table_ref.c[DBCOLUMNS.rowid].desc(),
+            ]
+        else:
+            order_by_clause = [
+                table_ref.c[DBCOLUMNS.date].asc(),
+                table_ref.c[DBCOLUMNS.rowid].asc(),
+            ]
 
         query = select(*[table_ref.c[col] for col in columns] if columns else table_ref)
 
         query = DBConnector.apply_filters(query, table_ref, filters)
 
         if last_seen_value:
-            query = query.where(
-                (table_ref.c.date > last_seen_value["date"])
-                | (
-                    and_(
-                        table_ref.c.date == last_seen_value["date"],
-                        table_ref.c[primary_key_column]
-                        > last_seen_value[primary_key_column],
+            if last_seen_value["direction"] == "forward" and flip_order:
+                query = query.where(
+                    (table_ref.c[DBCOLUMNS.date] < last_seen_value[DBCOLUMNS.date])
+                    | (
+                        and_(
+                            table_ref.c[DBCOLUMNS.date]
+                            == last_seen_value[DBCOLUMNS.date],
+                            table_ref.c[DBCOLUMNS.rowid]
+                            < last_seen_value[DBCOLUMNS.rowid],
+                        )
                     )
                 )
-            )
+            else:
+                query = query.where(
+                    (table_ref.c[DBCOLUMNS.date] > last_seen_value[DBCOLUMNS.date])
+                    | (
+                        and_(
+                            table_ref.c[DBCOLUMNS.date]
+                            == last_seen_value[DBCOLUMNS.date],
+                            table_ref.c[DBCOLUMNS.rowid]
+                            > last_seen_value[DBCOLUMNS.rowid],
+                        )
+                    )
+                )
 
         query = query.order_by(*order_by_clause).limit(limit)
 
@@ -222,18 +268,18 @@ class DBConnector:
         return result.fetchall()
 
     @staticmethod
-    def group_by_month(engine, table, filters=None):
+    def group_by_day(engine, table, filters=None):
         metadata = MetaData()
         table_ref = Table(table, metadata, autoload_with=engine)
 
         with engine.connect() as connection:
             query = select(
-                func.date_trunc("month", table_ref.c.date).label("month"),
+                func.date_trunc("day", table_ref.c.date).label("day"),
                 func.count(table_ref.c.rowid).label("count"),
             )
             query = DBConnector.apply_filters(query, table_ref, filters)
-            query = query.group_by(func.date_trunc("month", table_ref.c.date)).order_by(
-                func.date_trunc("month", table_ref.c.date)
+            query = query.group_by(func.date_trunc("day", table_ref.c.date)).order_by(
+                func.date_trunc("day", table_ref.c.date)
             )
 
             result = connection.execute(query)

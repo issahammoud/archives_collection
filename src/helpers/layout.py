@@ -1,5 +1,4 @@
 import base64
-import pandas as pd
 from dash import dcc, html
 import plotly.express as px
 from datetime import datetime
@@ -28,9 +27,9 @@ class Graph:
         )
         fig = px.bar(
             df,
-            x="month",
+            x="day",
             y="count",
-            hover_data={"month": "|%B %d, %Y"},
+            hover_data={"day": "|%B %d, %Y"},
         )
         fig.update_layout(layout)
         fig.update_layout(yaxis_title=None)
@@ -45,7 +44,8 @@ class Graph:
 
 
 class Layout:
-    PAGES = 3
+    SLIDES = 3
+    MAX_PAGES = 10
 
     @staticmethod
     def get_header():
@@ -77,7 +77,7 @@ class Layout:
         )
         tooltip = dmc.Tooltip(
             button,
-            label="Enroll in Intuitive Deep Learning course for free",
+            label="Enroll for free in Intuitive Deep Learning Course",
             multiline=True,
             withArrow=True,
             openDelay=3,
@@ -93,54 +93,48 @@ class Layout:
 
     @staticmethod
     def filter_by_text():
-        return dmc.Textarea(
+        return dmc.TextInput(
             id="query",
             placeholder="Search by text",
+            label=dmc.Text("Text", c="dimmed", fw=300),
             variant="subtle",
-            autosize=True,
             leftSection=dmc.ActionIcon(
                 DashIconify(icon="material-symbols-light:search"),
                 variant="subtle",
                 color="#0097b2",
-                id="filter_by_text",
+                id="text",
             ),
         )
 
     @staticmethod
     def filter_by_archive():
-        return dmc.Grid(
-            dmc.GridCol(
-                dmc.MultiSelect(
-                    placeholder="Select an archive",
-                    checkIconPosition="right",
-                    hidePickedOptions=True,
-                    maxDropdownHeight=200,
-                    searchable=True,
-                    clearable=True,
-                    leftSectionPointerEvents="none",
-                    leftSection=DashIconify(icon="bi-book", color="#0097b2"),
-                    variant="subtle",
-                    data=[val.title() for val in Archives],
-                    comboboxProps={
-                        "transitionProps": {"transition": "pop", "duration": 200}
-                    },
-                ),
-                span=12,
-            ),
-            align="center",
-            justify="center",
+        return dmc.MultiSelect(
+            placeholder="Search by archive",
+            id="archive",
+            label=dmc.Text("Archive", c="dimmed", fw=300),
+            checkIconPosition="right",
+            hidePickedOptions=True,
+            maxDropdownHeight=200,
+            searchable=True,
+            clearable=True,
+            leftSectionPointerEvents="none",
+            leftSection=DashIconify(icon="bi-book", color="#0097b2"),
+            variant="subtle",
+            data=list(Archives),
+            comboboxProps={"transitionProps": {"transition": "pop", "duration": 200}},
         )
 
     @staticmethod
     def filter_by_date():
         date = dmc.DatePickerInput(
             id="date",
+            label=dmc.Text("Date", c="dimmed", fw=300),
             valueFormat="DD/MM/YYYY",
             allowSingleDateInRange=False,
             value=DBConnector.get_min_max_dates(engine, DBConnector.TABLE),
             type="range",
             leftSection=DashIconify(icon="uiw:date", color="#0097b2"),
-            clearable=True,
+            clearable=False,
             variant="subtle",
         )
         return date
@@ -148,12 +142,13 @@ class Layout:
     @staticmethod
     def filter_by_tag():
         tags = DBConnector.get_tags(engine, DBConnector.TABLE)
-        tags = ["All"] + [tag.title() for tag in tags if tag]
+        tags = [tag.title() for tag in tags if tag]
 
         select = dmc.Select(
             id="tag",
             data=tags,
-            placeholder="Select a topic",
+            label=dmc.Text("Topic", c="dimmed", fw=300),
+            placeholder="Search by topic",
             checkIconPosition="right",
             maxDropdownHeight=200,
             searchable=True,
@@ -166,14 +161,47 @@ class Layout:
         return select
 
     @staticmethod
+    def get_switches():
+        sorting = dmc.ActionIcon(
+            DashIconify(icon="ic:outline-swap-vert", width=20),
+            id="asc_desc",
+            color="#ff5757",
+            variant="subtle",
+        )
+        sorting = dmc.Tooltip(
+            sorting,
+            label="Inverse date order",
+            multiline=True,
+            withArrow=True,
+            openDelay=3,
+            position="top",
+        )
+        null_img = dmc.ActionIcon(
+            DashIconify(icon="ic:sharp-image-not-supported", width=20),
+            id="null_img",
+            color="#ff5757",
+            variant="subtle",
+        )
+        null_img = dmc.Tooltip(
+            null_img,
+            label="Eliminate empty images",
+            multiline=True,
+            withArrow=True,
+            openDelay=3,
+            position="top",
+        )
+        return dmc.Group([sorting, null_img], gap="xl", justify="center")
+
+    @staticmethod
     def get_navbar():
         date = Layout.filter_by_date()
         tag = Layout.filter_by_tag()
         text = Layout.filter_by_text()
         archives = Layout.filter_by_archive()
+        switches = Layout.get_switches()
         return dmc.Paper(
             dmc.Stack(
-                [date, tag, text, archives],
+                [switches, date, tag, text, archives],
                 align="stretch",
                 justify="space-between",
                 gap="xl",
@@ -198,7 +226,7 @@ class Layout:
         return stats_bar
 
     @staticmethod
-    def get_card(byte_img, title, content, tag, archive, date, link):
+    def get_card(rowid, byte_img, title, content, tag, archive, date, link):
         src = (
             "data:image/png;base64,{}".format(base64.b64encode(byte_img).decode())
             if byte_img
@@ -262,12 +290,12 @@ class Layout:
                                     h=150,
                                     icon=DashIconify(
                                         icon="material-symbols:format-quote-rounded",
-                                        width=20,
+                                        width=25,
                                         color="#ff5757",
                                         style={
                                             "position": "absolute",
-                                            "top": 20,
-                                            "left": 20,
+                                            "top": 15,
+                                            "left": 15,
                                             "zIndex": 1,
                                             "transform": "scaleY(-1) scaleX(-1)",
                                         },
@@ -299,19 +327,25 @@ class Layout:
         )
 
     @staticmethod
+    def get_carousel_slides(args):
+        return [
+            dmc.CarouselSlide(Layout.get_card(*args[i]), style={"width": "33.33%"})
+            for i in range(len(args))
+        ]
+
+    @staticmethod
     def get_carousel(args):
         carousel = dmc.Carousel(
-            [
-                dmc.CarouselSlide(Layout.get_card(*args[i]), style={"width": "33.33%"})
-                for i in range(len(args))
-            ],
-            id="carousel",
+            Layout.get_carousel_slides(args),
             slideSize="33.33%",
             w="100%",
+            id="carousel",
             slideGap="md",
             loop=False,
             align="start",
-            slidesToScroll=Layout.PAGES,
+            initialSlide=0,
+            dragFree=True,
+            slidesToScroll=Layout.SLIDES,
             nextControlIcon=DashIconify(
                 icon="material-symbols:navigate-next", color="#0097b2"
             ),
@@ -320,6 +354,13 @@ class Layout:
             ),
         )
         return carousel
+
+    @staticmethod
+    def get_main(df, args):
+        stats = Layout.get_stats(df)
+        carousel = Layout.get_carousel(args)
+        main = dmc.Stack([stats, carousel], gap="xl", align="stretch")
+        return main
 
     @staticmethod
     def get_footer():
@@ -336,37 +377,16 @@ class Layout:
     def get_layout():
         header = Layout.get_header()
         navbar = Layout.get_navbar()
-        df = pd.DataFrame(DBConnector.group_by_month(engine, DBConnector.TABLE))
-        stats = Layout.get_stats(df)
-
-        args = DBConnector.fetch_data_keyset(
-            engine,
-            DBConnector.TABLE,
-            DBCOLUMNS.rowid,
-            limit=100,
-            direction="desc",
-            filters={
-                DBCOLUMNS.image: ("notnull", None),
-                DBCOLUMNS.date: ("gt", datetime(2000, 1, 1)),
-            },
-            columns=[
-                DBCOLUMNS.image,
-                DBCOLUMNS.title,
-                DBCOLUMNS.content,
-                DBCOLUMNS.tag,
-                DBCOLUMNS.archive,
-                DBCOLUMNS.date,
-                DBCOLUMNS.link,
-            ],
-        )
-        carousel = Layout.get_carousel(args)
-
-        main = dmc.Stack([stats, carousel], gap="xl", align="stretch")
 
         footer = Layout.get_footer()
 
         appshell = dmc.AppShell(
             [
+                dcc.Store(id="previous_active", data=0),
+                dcc.Store(
+                    id="last_seen",
+                    data={DBCOLUMNS.rowid: "", DBCOLUMNS.date: None, "direction": None},
+                ),
                 dmc.AppShellHeader(
                     dmc.Container(
                         header,
@@ -378,7 +398,7 @@ class Layout:
                     navbar,
                     withBorder=False,
                 ),
-                dmc.AppShellMain(dmc.Container(main, id="main", size="xl", mt=30)),
+                dmc.AppShellMain(dmc.Container(id="main", size="xl", mt=30)),
                 dmc.AppShellFooter(footer, withBorder=False),
             ],
             header={"height": 120},
