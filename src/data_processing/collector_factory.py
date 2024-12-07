@@ -61,7 +61,7 @@ class CollectorFactory:
         all_urls = []
 
         for collector in self.collectors:
-            all_urls.append(collector.get_all_url(collector.archive))
+            all_urls.append(collector.get_all_url())
 
         all_urls = alternate_elements(all_urls)
         assert len(all_urls) > 0, "No pages to collect"
@@ -71,7 +71,7 @@ class CollectorFactory:
         date, url = args
         for collector in self.collectors:
             if re.match(collector.url_format.replace("?", "\?").format(".*"), url):
-                collector.parse_single_page(date, url, collector.content_selector)
+                collector.parse_single_page(date, url)
                 break
 
     def run(self):

@@ -26,12 +26,12 @@ class DBConnector:
         "ge": lambda column, value: column >= value,
         "le": lambda column, value: column <= value,
         "in": lambda column, value: column.in_(value),
-        "like": lambda column, value: column.like(value),
+        "like": lambda column, value: func.lower(column).like(func.lower(value)),
         "notnull": lambda column, _: column.isnot(None),
-        "isnull": lambda col, _: col.is_(None),
-        "text_search": lambda col, value: text(
-            f"{col.name} @@ to_tsquery(:query)"
-        ).bindparams(query=" & ".join(value.split())),
+        "isnull": lambda column, _: column.is_(None),
+        "text_search": lambda column, value: text(
+            f"{column.name} @@ to_tsquery(:query)"
+        ).bindparams(query=" | ".join(value.split())),
     }
 
     @staticmethod
@@ -193,33 +193,38 @@ class DBConnector:
 
         with engine.connect() as connection:
             query = select(
-                func.trim(func.upper(table_ref.c.tag)).label("tag"),
+                func.trim(func.upper(table_ref.c[DBCOLUMNS.tag])).label("tag"),
                 func.count().label("count"),
             )
             query = DBConnector.apply_filters(query, table_ref, filters)
 
             query = (
-                query.group_by(func.trim(func.upper(table_ref.c.tag)))
+                query.group_by(func.trim(func.upper(table_ref.c[DBCOLUMNS.tag])))
                 .order_by(func.count().desc())
                 .limit(100)
             )
             result = connection.execute(query)
-            return [row.tag for row in result]
+
+            return [(row.tag) for row in result]
 
     @staticmethod
     def fetch_data_keyset(
         engine,
         table,
         last_seen_value=None,
+        direction="forward",
         columns=None,
         limit=10,
         filters=None,
-        flip_order=False,
+        desc_order=True,
     ):
+
         metadata = MetaData()
         table_ref = Table(table, metadata, autoload_with=engine)
 
-        if flip_order:
+        if (direction == "forward" and desc_order) or (
+            direction == "backward" and not desc_order
+        ):
             order_by_clause = [
                 table_ref.c[DBCOLUMNS.date].desc(),
                 table_ref.c[DBCOLUMNS.rowid].desc(),
@@ -235,7 +240,9 @@ class DBConnector:
         query = DBConnector.apply_filters(query, table_ref, filters)
 
         if last_seen_value:
-            if last_seen_value["direction"] == "forward" and flip_order:
+            if (direction == "forward" and desc_order) or (
+                direction == "backward" and not desc_order
+            ):
                 query = query.where(
                     (table_ref.c[DBCOLUMNS.date] < last_seen_value[DBCOLUMNS.date])
                     | (
@@ -265,7 +272,9 @@ class DBConnector:
         with engine.connect() as connection:
             result = connection.execute(query)
 
-        return result.fetchall()
+        fetched_data = result.fetchall()
+
+        return fetched_data if direction == "forward" else fetched_data[::-1]
 
     @staticmethod
     def group_by_day(engine, table, filters=None):

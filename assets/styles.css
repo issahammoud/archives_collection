@@ -1,0 +1,30 @@
+  .dmc-indicator {
+  background-color: rgba(0, 151, 178, 0.1);
+  width: 5px;
+  height: 5px;
+    &[data-active] {
+
+      background-color: rgba(255, 87, 87, 0.5);
+    }
+  }
+
+  .dmc-control {
+
+    &[data-inactive] {
+      opacity: 0;
+      cursor: default;
+    }
+  }
+
+  .dmc-controls {
+    transition: opacity 150ms ease;
+    opacity: 0;
+  }
+
+  .dmc-root {
+    &:hover {
+      .dmc-controls {
+        opacity: 1;
+      }
+    }
+  }

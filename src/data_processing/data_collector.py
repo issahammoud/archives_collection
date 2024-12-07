@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, date
 
+from src.utils.utils import hash_url
 from src.helpers.enum import DBCOLUMNS, headers
 from src.helpers.db_connector import DBConnector
 
@@ -30,18 +31,20 @@ class DataCollector(ABC):
             return dateparser.parse(str_date, ["%d-%m-%Y"]).date()
         return datetime.now().date()
 
-    def get_all_url(self, archive):
+    def get_all_url(self):
         all_dates = set()
         for day in range((self.end_date - self.begin_date + timedelta(days=1)).days):
             date = self.begin_date + timedelta(days=day)
             all_dates.add(date)
 
-        done_dates = DBConnector.get_done_dates(engine, DBConnector.TABLE, archive)
-        done_dates = set([date[0].date() for date in done_dates])
-        logger.info(f"{archive}: we already collected {len(done_dates)} pages.")
+        done_dates = DBConnector.get_done_dates(engine, DBConnector.TABLE, self.archive)
+        done_dates = set([date.date() for date in done_dates])
+        logger.info(f"{self.archive}: we already collected {len(done_dates)} pages.")
 
         remaining_dates = all_dates - done_dates
-        logger.info(f"{archive}: There are {len(remaining_dates)} pages to collect.")
+        logger.info(
+            f"{self.archive}: There are {len(remaining_dates)} pages to collect."
+        )
 
         remaining_dates = sorted(remaining_dates)[::-1]
         all_urls = [
@@ -57,11 +60,11 @@ class DataCollector(ABC):
         ), f"URL {url} not found, error code {req.status_code}"
         return req.content
 
-    def parse_single_page(self, date, url, content_selector):
+    def parse_single_page(self, date, url):
         try:
             content = self.get_url_content(url)
             parsed_content = BeautifulSoup(content, "html.parser")
-            sections = parsed_content.select(content_selector)
+            sections = parsed_content.select(self.content_selector)
             logger.debug(f"Page {url} contains {len(sections)} sections")
 
             for section in sections:
@@ -69,7 +72,7 @@ class DataCollector(ABC):
                     data = self.parse_single_section(section)
 
                     data[DBCOLUMNS.date] = date
-
+                    data[DBCOLUMNS.rowid] = hash_url(data[DBCOLUMNS.link])
                     DBConnector.insert_row(engine, DBConnector.TABLE, data)
                     logger.debug("Parsed a section successfully")
 

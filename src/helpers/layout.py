@@ -7,12 +7,14 @@ from dash_iconify import DashIconify
 import dash_mantine_components as dmc
 from src.helpers.db_connector import DBConnector
 from src.helpers.enum import Archives, DBCOLUMNS
+from src.utils.utils import resize_image_for_html
+
 
 engine = DBConnector.get_engine(DBConnector.DBNAME)
 
 
 class Graph:
-    def get_graph(df):
+    def get_graph(df, order):
         layout = go.Layout(
             xaxis=dict(
                 autorange=True,
@@ -31,14 +33,16 @@ class Graph:
             y="count",
             hover_data={"day": "|%B %d, %Y"},
         )
+
         fig.update_layout(layout)
-        fig.update_layout(yaxis_title=None)
-        fig.update_layout(xaxis_title=None)
+        fig.update_layout(
+            xaxis=dict(title=None, autorange=order), yaxis=dict(title=None)
+        )
         fig.update_traces(marker_color="#0097b2")
         graph = dcc.Graph(
             figure=fig,
             style={"height": 60},
-            config={"displaylogo": False, "displayModeBar": False},
+            config={"displaylogo": False, "displayModeBar": False, "scrollZoom": True},
         )
         return graph
 
@@ -49,7 +53,7 @@ class Layout:
 
     @staticmethod
     def get_header():
-        byte_img = open("src/helpers/logo.png", "rb").read()
+        byte_img = open("assets/logo.png", "rb").read()
         src = "data:image/png;base64,{}".format(
             base64.b64encode(byte_img).decode("ascii")
         )
@@ -98,11 +102,8 @@ class Layout:
             placeholder="Search by text",
             label=dmc.Text("Text", c="dimmed", fw=300),
             variant="subtle",
-            leftSection=dmc.ActionIcon(
-                DashIconify(icon="material-symbols-light:search"),
-                variant="subtle",
-                color="#0097b2",
-                id="text",
+            leftSection=DashIconify(
+                icon="material-symbols-light:text-ad-outline", color="#0097b2", width=20
             ),
         )
 
@@ -142,8 +143,7 @@ class Layout:
     @staticmethod
     def filter_by_tag():
         tags = DBConnector.get_tags(engine, DBConnector.TABLE)
-        tags = [tag.title() for tag in tags if tag]
-
+        tags = [tag.title() for tag in tags if tag and not tag.isnumeric()]
         select = dmc.Select(
             id="tag",
             data=tags,
@@ -212,13 +212,25 @@ class Layout:
         )
 
     @staticmethod
-    def get_stats(df):
+    def get_alert():
+        return dmc.Container(
+            dmc.Alert(
+                dmc.Text(
+                    "We didn't find any data with your current filters.",
+                    c="dimmed",
+                    fw=300,
+                ),
+                title=dmc.Text("Warning", fw=500),
+                color="red",
+            )
+        )
+
+    @staticmethod
+    def get_stats(df, order):
+        order = order if order else "reversed"
         stats_bar = dmc.Grid(
             [
-                dmc.GridCol(
-                    Graph.get_graph(df),
-                    span=12,
-                ),
+                dmc.GridCol(Graph.get_graph(df, order), span=12),
             ],
             justify="center",
             align="flex-end",
@@ -227,14 +239,15 @@ class Layout:
 
     @staticmethod
     def get_card(rowid, byte_img, title, content, tag, archive, date, link):
+        img_height = 200
         src = (
-            "data:image/png;base64,{}".format(base64.b64encode(byte_img).decode())
+            resize_image_for_html(byte_img, target_height=img_height)
             if byte_img
             else "https://placehold.co/600x400?text=Placeholder"
         )
         date = datetime.strftime(date, "%B, %d %Y")
         archive = archive.strip().title() if archive else archive
-        tag = tag.strip().title() if tag else tag
+        tag = tag.strip().title() if tag else "None"
         content = content.strip() if content else content
         card = dmc.Card(
             children=[
@@ -252,7 +265,7 @@ class Layout:
                     py="sm",
                 ),
                 dmc.CardSection(
-                    dmc.Image(fallbackSrc=src, radius=2, h=300),
+                    dmc.Image(fallbackSrc=src, radius=2, h=img_height),
                     withBorder=True,
                     mb=10,
                 ),
@@ -309,7 +322,7 @@ class Layout:
                                         fs="italic",
                                         ta="left",
                                     ),
-                                    p=5,
+                                    pb=15,
                                 ),
                             ]
                         )
@@ -344,7 +357,7 @@ class Layout:
             loop=False,
             align="start",
             initialSlide=0,
-            dragFree=True,
+            dragFree=False,
             slidesToScroll=Layout.SLIDES,
             nextControlIcon=DashIconify(
                 icon="material-symbols:navigate-next", color="#0097b2"
@@ -352,12 +365,19 @@ class Layout:
             previousControlIcon=DashIconify(
                 icon="material-symbols:navigate-before", color="#0097b2"
             ),
+            withIndicators=True,
+            classNames={
+                "indicator": "dmc-indicator",
+                "control": "dmc-control",
+                "controls": "dmc-controls",
+                "root": "dmc-root",
+            },
         )
         return carousel
 
     @staticmethod
-    def get_main(df, args):
-        stats = Layout.get_stats(df)
+    def get_main(df, args, order):
+        stats = Layout.get_stats(df, order)
         carousel = Layout.get_carousel(args)
         main = dmc.Stack([stats, carousel], gap="xl", align="stretch")
         return main
@@ -377,7 +397,6 @@ class Layout:
     def get_layout():
         header = Layout.get_header()
         navbar = Layout.get_navbar()
-
         footer = Layout.get_footer()
 
         appshell = dmc.AppShell(
@@ -398,7 +417,7 @@ class Layout:
                     navbar,
                     withBorder=False,
                 ),
-                dmc.AppShellMain(dmc.Container(id="main", size="xl", mt=30)),
+                dmc.AppShellMain(dmc.Container(id="main", size="xl", p="xl")),
                 dmc.AppShellFooter(footer, withBorder=False),
             ],
             header={"height": 120},

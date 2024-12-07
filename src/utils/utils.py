@@ -1,6 +1,8 @@
+import base64
 import hashlib
 import itertools
 import numpy as np
+from wand.image import Image as WandImage
 
 
 def alternate_elements(list_of_list):
@@ -17,3 +19,23 @@ def alternate_elements(list_of_list):
 
 def hash_url(url):
     return hashlib.sha256(url.encode("utf-8")).hexdigest()
+
+
+def resize_image_for_html(image_bytes, target_height=300):
+    """
+    We used this library instead of PIL or cv2 because many
+    images were encoded in an unsupported format by those libraries.
+    """
+    try:
+        with WandImage(blob=image_bytes) as img:
+            aspect_ratio = img.width / img.height
+            new_width = int(target_height * aspect_ratio)
+            img.resize(new_width, target_height)
+            resized_image_bytes = img.make_blob(format="png")
+
+        encoded_image = base64.b64encode(resized_image_bytes).decode()
+    except Exception as e:
+        print(f"Error processing image: {e}")
+        encoded_image = base64.b64encode(image_bytes).decode("utf-8")
+
+    return f"data:image/png;base64,{encoded_image}"
