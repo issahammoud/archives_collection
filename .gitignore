@@ -54,4 +54,5 @@ miniconda/
 onnx/
 *.ipynb
 *.png
+!logo.png
 *env/

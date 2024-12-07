@@ -30,8 +30,8 @@ class DBConnector:
         "notnull": lambda column, _: column.isnot(None),
         "isnull": lambda column, _: column.is_(None),
         "text_search": lambda column, value: text(
-            f"{column.name} @@ to_tsquery(:query)"
-        ).bindparams(query=" | ".join(value.split())),
+            f"{column.name} @@ to_tsquery('french', :query)"
+        ).bindparams(query=" & ".join(value.split())),
     }
 
     @staticmethod

@@ -38,6 +38,7 @@ def get_filters_dict(archive, tag, date_range, submit, null_clicks, query):
 
 @callback(
     Output("main", "children"),
+    Output("badge", "children"),
     Output("last_seen", "data"),
     Input("archive", "value"),
     Input("tag", "value"),
@@ -69,6 +70,8 @@ def create_content(archive, tag, date_range, submit, sort_clicks, null_clicks, q
         ],
         desc_order=order,
     )
+    total_count = DBConnector.get_total_count(engine, DBConnector.TABLE, filters)
+    badge = Layout.get_badge(total_count)
     if len(args) > Layout.SLIDES:
         last_seen = {
             "forward": {
@@ -81,8 +84,8 @@ def create_content(archive, tag, date_range, submit, sort_clicks, null_clicks, q
             },
         }
 
-        return Layout.get_main(df, args, not order), last_seen
-    return Layout.get_alert(), dash.no_update
+        return Layout.get_main(df, args, not order), badge, last_seen
+    return Layout.get_alert(), badge, dash.no_update
 
 
 @callback(
@@ -158,4 +161,22 @@ def update_carousel(
             )
 
         return dash.no_update, active, last_seen, active
+    raise PreventUpdate
+
+
+@callback(
+    Output("drawer", "opened"),
+    Output("open_drawer", "style"),
+    Input("open_drawer", "n_clicks"),
+    State("drawer", "opened"),
+    State("open_drawer", "style"),
+)
+def open_close_drawer(n_clicks, opened, style):
+    if n_clicks:
+        (
+            style.update({"left": 0})
+            if opened
+            else style.update({"left": "calc(12% - 15px)"})
+        )
+        return not opened, style
     raise PreventUpdate

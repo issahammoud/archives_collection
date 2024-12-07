@@ -7,7 +7,7 @@ from dash_iconify import DashIconify
 import dash_mantine_components as dmc
 from src.helpers.db_connector import DBConnector
 from src.helpers.enum import Archives, DBCOLUMNS
-from src.utils.utils import resize_image_for_html
+from src.utils.utils import resize_image_for_html, convert_count_to_str
 
 
 engine = DBConnector.get_engine(DBConnector.DBNAME)
@@ -130,7 +130,7 @@ class Layout:
         date = dmc.DatePickerInput(
             id="date",
             label=dmc.Text("Date", c="dimmed", fw=300),
-            valueFormat="DD/MM/YYYY",
+            valueFormat="DD/MM/YY",
             allowSingleDateInRange=False,
             value=DBConnector.get_min_max_dates(engine, DBConnector.TABLE),
             type="range",
@@ -161,7 +161,29 @@ class Layout:
         return select
 
     @staticmethod
-    def get_switches():
+    def get_badge(count):
+        full_str, approx = convert_count_to_str(count)
+        badge = dmc.Tooltip(
+            dmc.Badge(
+                dmc.Text(approx, fw=300, size="xs"),
+                color="#ff5757",
+                size="xl",
+                variant="light",
+                radius="xl",
+                circle=True,
+            ),
+            id="badge",
+            label=f"{full_str} articles",
+            multiline=True,
+            withArrow=True,
+            openDelay=3,
+            position="top",
+        )
+        return badge
+
+    @staticmethod
+    def get_switches(total_count):
+
         sorting = dmc.ActionIcon(
             DashIconify(icon="ic:outline-swap-vert", width=20),
             id="asc_desc",
@@ -190,25 +212,63 @@ class Layout:
             openDelay=3,
             position="top",
         )
-        return dmc.Group([sorting, null_img], gap="xl", justify="center")
+
+        badge = Layout.get_badge(total_count)
+        return dmc.Group([badge, sorting, null_img], gap="xl", justify="center")
 
     @staticmethod
-    def get_navbar():
+    def get_navbar(total_count=None):
+        total_count = (
+            total_count
+            if total_count
+            else DBConnector.get_total_count(engine, DBConnector.TABLE)
+        )
         date = Layout.filter_by_date()
         tag = Layout.filter_by_tag()
         text = Layout.filter_by_text()
         archives = Layout.filter_by_archive()
-        switches = Layout.get_switches()
-        return dmc.Paper(
-            dmc.Stack(
-                [switches, date, tag, text, archives],
-                align="stretch",
-                justify="space-between",
-                gap="xl",
+        switches = Layout.get_switches(total_count)
+        drawer_control = dmc.ActionIcon(
+            DashIconify(
+                icon="material-symbols:swap-horizontal-circle-rounded",
+                width=40,
+                height=40,
             ),
-            p=20,
-            shadow="xs",
-            h="100%",
+            id="open_drawer",
+            variant="subtle",
+            w=20,
+            color="#ff5757",
+            style={
+                "position": "fixed",
+                "top": "50%",
+                "left": "calc(12% - 15px)",
+                "zIndex": 1000,
+            },
+        )
+
+        return dmc.Box(
+            [
+                drawer_control,
+                dmc.Drawer(
+                    dmc.Stack(
+                        [switches, date, tag, text, archives],
+                        align="stretch",
+                        justify="space-between",
+                        gap="xl",
+                    ),
+                    id="drawer",
+                    closeOnClickOutside=False,
+                    closeOnEscape=False,
+                    withCloseButton=False,
+                    opened=True,
+                    withOverlay=False,
+                    size="12%",
+                    shadow="sm",
+                    keepMounted=False,
+                    radius="sm",
+                    offset="120px 0",
+                ),
+            ]
         )
 
     @staticmethod
@@ -350,12 +410,12 @@ class Layout:
     def get_carousel(args):
         carousel = dmc.Carousel(
             Layout.get_carousel_slides(args),
-            slideSize="33.33%",
+            slideSize="33%",
             w="100%",
             id="carousel",
             slideGap="md",
             loop=False,
-            align="start",
+            align="center",
             initialSlide=0,
             dragFree=False,
             slidesToScroll=Layout.SLIDES,
@@ -396,9 +456,8 @@ class Layout:
     @staticmethod
     def get_layout():
         header = Layout.get_header()
-        navbar = Layout.get_navbar()
         footer = Layout.get_footer()
-
+        navbar = Layout.get_navbar()
         appshell = dmc.AppShell(
             [
                 dcc.Store(id="previous_active", data=0),
@@ -413,19 +472,11 @@ class Layout:
                     ),
                     withBorder=True,
                 ),
-                dmc.AppShellNavbar(
-                    navbar,
-                    withBorder=False,
-                ),
-                dmc.AppShellMain(dmc.Container(id="main", size="xl", p="xl")),
+                dmc.AppShellSection(dmc.Container(navbar, size="lg", p="lg")),
+                dmc.AppShellMain(dmc.Container(id="main", size="lg", p="lg")),
                 dmc.AppShellFooter(footer, withBorder=False),
             ],
             header={"height": 120},
-            navbar={
-                "width": 280,
-                "breakpoint": "sm",
-                "collapsed": {"mobile": True},
-            },
             footer={"height": 60},
         )
         return dmc.MantineProvider(appshell)
