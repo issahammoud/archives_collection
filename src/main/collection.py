@@ -1,6 +1,6 @@
 from src.utils.logging import logging
 from src.utils.parser import get_config
-from src.data_processing.collector_factory import CollectorFactory
+from src.data_scrapping.collector_factory import CollectorFactory
 
 logger = logging.getLogger(__name__)
 

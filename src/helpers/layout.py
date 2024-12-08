@@ -49,7 +49,7 @@ class Graph:
 
 class Layout:
     SLIDES = 3
-    MAX_PAGES = 10
+    MAX_PAGES = 20
 
     @staticmethod
     def get_header():
@@ -171,6 +171,7 @@ class Layout:
                 variant="light",
                 radius="xl",
                 circle=True,
+                p=2,
             ),
             id="badge",
             label=f"{full_str} articles",
@@ -230,19 +231,23 @@ class Layout:
         switches = Layout.get_switches(total_count)
         drawer_control = dmc.ActionIcon(
             DashIconify(
-                icon="material-symbols:swap-horizontal-circle-rounded",
-                width=40,
-                height=40,
+                icon="ic:round-navigate-next",
+                width=25,
+                height=25,
+                color="#ff5757",
             ),
             id="open_drawer",
             variant="subtle",
             w=20,
+            radius=20,
             color="#ff5757",
             style={
                 "position": "fixed",
                 "top": "50%",
                 "left": "calc(12% - 15px)",
                 "zIndex": 1000,
+                "transform": "rotate(180deg)",
+                "backgroundColor": "white",
             },
         )
 
@@ -280,7 +285,7 @@ class Layout:
                     c="dimmed",
                     fw=300,
                 ),
-                title=dmc.Text("Warning", fw=500),
+                title=dmc.Text("Sorry", fw=500),
                 color="red",
             )
         )
@@ -350,7 +355,9 @@ class Layout:
                                 ),
                                 dmc.Blockquote(
                                     dmc.ScrollArea(
-                                        dmc.Text(content, size="sm", ta="justify"),
+                                        dmc.Text(
+                                            content, size="sm", ta="justify", fw=300
+                                        ),
                                         type="hover",
                                         offsetScrollbars=True,
                                         scrollbarSize=4,
@@ -395,6 +402,7 @@ class Layout:
             shadow="xs",
             radius="md",
         )
+        return card
         return html.A(
             children=card, href=link, target="_blank", style={"textDecoration": "none"}
         )

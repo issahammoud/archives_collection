@@ -31,20 +31,18 @@ class DataCollector(ABC):
             return dateparser.parse(str_date, ["%d-%m-%Y"]).date()
         return datetime.now().date()
 
-    def get_all_url(self):
+    def get_all_url(self, archive):
         all_dates = set()
         for day in range((self.end_date - self.begin_date + timedelta(days=1)).days):
             date = self.begin_date + timedelta(days=day)
             all_dates.add(date)
 
-        done_dates = DBConnector.get_done_dates(engine, DBConnector.TABLE, self.archive)
+        done_dates = DBConnector.get_done_dates(engine, DBConnector.TABLE, archive)
         done_dates = set([date.date() for date in done_dates])
-        logger.info(f"{self.archive}: we already collected {len(done_dates)} pages.")
+        logger.info(f"{archive}: we already collected {len(done_dates)} pages.")
 
         remaining_dates = all_dates - done_dates
-        logger.info(
-            f"{self.archive}: There are {len(remaining_dates)} pages to collect."
-        )
+        logger.info(f"{archive}: There are {len(remaining_dates)} pages to collect.")
 
         remaining_dates = sorted(remaining_dates)[::-1]
         all_urls = [

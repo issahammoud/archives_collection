@@ -1,7 +1,7 @@
 import os
 import logging
 from bs4 import BeautifulSoup
-from src.data_processing.data_collector import DataCollector
+from src.data_scrapping.data_collector import DataCollector
 
 
 logger = logging.getLogger(__name__)

@@ -1,5 +1,5 @@
 {
-"archives": ["lemonde", "lefigaro", "vinghtminutes", "leparisien"],
+"archives": ["lemonde", "lefigaro",  "leparisien", "lhumanite"],
 "begin_date": "01-01-2000",
 "end_date": null,
 "workers": 6,

@@ -22,7 +22,7 @@ def get_filters_dict(archive, tag, date_range, submit, null_clicks, query):
     filters.update({DBCOLUMNS.archive: [("in", archive)]} if archive else {})
 
     filters.update(
-        {DBCOLUMNS.text_searchable: [("text_search", query)]}
+        {DBCOLUMNS.text_searchable: [("text_search", " & ".join(query.split()))]}
         if submit and query
         else {}
     )
@@ -174,9 +174,11 @@ def update_carousel(
 def open_close_drawer(n_clicks, opened, style):
     if n_clicks:
         (
-            style.update({"left": 0})
+            style.update({"left": 0, "transform": "rotate(0deg)"})
             if opened
-            else style.update({"left": "calc(12% - 15px)"})
+            else style.update(
+                {"left": "calc(12% - 15px)", "transform": "rotate(180deg)"}
+            )
         )
         return not opened, style
     raise PreventUpdate

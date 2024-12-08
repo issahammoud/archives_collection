@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from babel.dates import format_datetime
 from src.helpers.enum import Archives, DBCOLUMNS
-from src.data_processing.data_collector import DataCollector
+from src.data_scrapping.data_collector import DataCollector
 
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,9 @@ class LeMonde(DataCollector):
         self.content_selector = "section#river > section.teaser"
         self.min_date = datetime.strptime("19-12-1944", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="dd-MM-Y")
-        self.has_multiple_pages = False
+        self.has_multiple_pages = True
+        self.page_selector = "section.river__pagination > a"
+        self.page_url_suffix = "/{}/"
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
     def parse_single_section(self, section):
@@ -44,7 +46,7 @@ class LeMonde(DataCollector):
 class LeFigaro(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = (
-            "https://recherche.lefigaro.fr/recherche/tout/?datemin={0}&datemax={0}"
+            "https://recherche.lefigaro.fr/recherche/_/?datemin={0}&datemax={0}"
         )
         self.archive = Archives.lefigaro
         self.content_selector = "#articles-list > article"
@@ -149,6 +151,7 @@ class VingthMinutes(DataCollector):
 
 
 class OuestFrance(DataCollector):
+    # note: we didn't collect data from this site yet.
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.ouest-france.fr/archives/{}"
         self.archive = Archives.ouestfrance
@@ -189,9 +192,10 @@ class OuestFrance(DataCollector):
 
 
 class Liberation(DataCollector):
+    # note: this class doesn't retrieve successfully the images yet
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.liberation.fr/archives/{}"
-        self._base_url = "https://www.liberation.fr/"
+        self._base_url = "https://www.liberation.fr"
         self.archive = Archives.liberation
         self.content_selector = "main article"
         self.min_date = datetime.strptime("01-01-1998", "%d-%m-%Y").date()
@@ -211,9 +215,15 @@ class Liberation(DataCollector):
             image = None
         title = section_content.main.h1.text.strip()
 
-        content = section_content.select("main > div > div > span")[-1].text.strip()
+        content = " ".join(
+            [
+                span.text.strip()
+                for span in section_content.select("main > div > div > span")
+                if len(span.text) > 5
+            ]
+        ).strip()
         tag = section_content.select("main > div > div > div > div > span")[
-            -1
+            0
         ].text.strip()
         tag = tag if tag else None
 
@@ -229,6 +239,7 @@ class Liberation(DataCollector):
 
 
 class Mediapart(DataCollector):
+    # note: we don't have a correct structure for this site for retrieving
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.mediapart.fr/journal/une/{}"
         self._base_url = "https://www.mediapart.fr"

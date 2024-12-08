@@ -9,8 +9,8 @@ from src.helpers.enum import Archives
 from src.helpers.db_connector import DBConnector
 
 from src.utils.utils import alternate_elements
-from src.data_processing.decorators import AddPages
-from src.data_processing.collectors import (
+from src.data_scrapping.decorators import AddPages
+from src.data_scrapping.collectors import (
     LeMonde,
     LeFigaro,
     LesEchos,
@@ -61,7 +61,7 @@ class CollectorFactory:
         all_urls = []
 
         for collector in self.collectors:
-            all_urls.append(collector.get_all_url())
+            all_urls.append(collector.get_all_url(collector.archive))
 
         all_urls = alternate_elements(all_urls)
         assert len(all_urls) > 0, "No pages to collect"
