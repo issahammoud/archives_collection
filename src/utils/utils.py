@@ -2,6 +2,8 @@ import base64
 import hashlib
 import itertools
 import numpy as np
+from functools import wraps
+from sqlalchemy import inspect
 from wand.image import Image as WandImage
 
 
@@ -54,3 +56,23 @@ def convert_count_to_str(count):
         return full_str, f"{round(count / 1000, 1)}K"
 
     return full_str, count
+
+
+def has_table_decorator(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        engine = engine = kwargs.get("engine", args[0])
+        table = kwargs.get("table", args[1])
+
+        if not engine or not table:
+            raise ValueError(
+                "Both 'engine' and 'table_name' must be provided as arguments."
+            )
+
+        inspector = inspect(engine)
+        if table not in inspector.get_table_names():
+            return None
+
+        return func(*args, **kwargs)
+
+    return wrapper

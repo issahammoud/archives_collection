@@ -127,12 +127,16 @@ class Layout:
 
     @staticmethod
     def filter_by_date():
+        min_max_dates = DBConnector.get_min_max_dates(engine, DBConnector.TABLE)
+        min_max_dates = (
+            min_max_dates if min_max_dates else [datetime.now(), datetime.now()]
+        )
         date = dmc.DatePickerInput(
             id="date",
             label=dmc.Text("Date", c="dimmed", fw=300),
             valueFormat="DD/MM/YY",
             allowSingleDateInRange=False,
-            value=DBConnector.get_min_max_dates(engine, DBConnector.TABLE),
+            value=min_max_dates,
             type="range",
             leftSection=DashIconify(icon="uiw:date", color="#0097b2"),
             clearable=False,
@@ -143,6 +147,7 @@ class Layout:
     @staticmethod
     def filter_by_tag():
         tags = DBConnector.get_tags(engine, DBConnector.TABLE)
+        tags = tags if tags else []
         tags = [tag.title() for tag in tags if tag and not tag.isnumeric()]
         select = dmc.Select(
             id="tag",
@@ -222,8 +227,9 @@ class Layout:
         total_count = (
             total_count
             if total_count
-            else DBConnector.get_total_count(engine, DBConnector.TABLE)
+            else DBConnector.get_total_count(engine, DBConnector.TABLE) or 0
         )
+
         date = Layout.filter_by_date()
         tag = Layout.filter_by_tag()
         text = Layout.filter_by_text()

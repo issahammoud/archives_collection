@@ -1,3 +1,4 @@
+import os
 from sqlalchemy import (
     create_engine,
     MetaData,
@@ -12,11 +13,16 @@ from sqlalchemy import (
 from sqlalchemy.sql import and_
 from sqlalchemy.types import String, DateTime, LargeBinary
 
+
 from src.helpers.enum import DBCOLUMNS
+from src.utils.utils import has_table_decorator
 
 
 class DBConnector:
-    DBNAME = "postgresql:///archives"
+    DBNAME = (
+        f'postgresql://{os.getenv("POSTGRES_USER")}:'
+        f'{os.getenv("POSTGRES_PASSWORD")}@db:5432/{os.getenv("POSTGRES_DB")}'
+    )
     TABLE = "sections"
 
     operator_map = {
@@ -121,6 +127,7 @@ class DBConnector:
                     query = query.where(and_(*conditions))
         return query
 
+    @has_table_decorator
     @staticmethod
     def get_total_count(engine, table, filters=None):
         metadata = MetaData()
@@ -134,6 +141,7 @@ class DBConnector:
             total_count = connection.execute(query).scalar()
         return total_count
 
+    @has_table_decorator
     @staticmethod
     def get_done_dates(engine, table, archive, filters=None):
         metadata = MetaData()
@@ -149,6 +157,7 @@ class DBConnector:
             result = connection.execute(query)
             return [row[0] for row in result]
 
+    @has_table_decorator
     @staticmethod
     def get_archive_rows(engine, table, archive, columns=None, filters=None):
         metadata = MetaData()
@@ -163,6 +172,7 @@ class DBConnector:
             result = connection.execute(query)
             return result.fetchall()
 
+    @has_table_decorator
     @staticmethod
     def get_archive_count(engine, table, archive, filters=None):
         metadata = MetaData()
@@ -174,6 +184,7 @@ class DBConnector:
             result = connection.execute(query)
             return result.scalar()
 
+    @has_table_decorator
     @staticmethod
     def get_archive_freq(engine, table, filters=None):
         metadata = MetaData()
@@ -186,6 +197,7 @@ class DBConnector:
             result = connection.execute(query)
             return result.fetchall()
 
+    @has_table_decorator
     @staticmethod
     def get_tags(engine, table, filters=None):
         metadata = MetaData()
@@ -207,6 +219,7 @@ class DBConnector:
 
             return [(row.tag) for row in result]
 
+    @has_table_decorator
     @staticmethod
     def fetch_data_keyset(
         engine,
@@ -276,6 +289,7 @@ class DBConnector:
 
         return fetched_data if direction == "forward" else fetched_data[::-1]
 
+    @has_table_decorator
     @staticmethod
     def group_by_day(engine, table, filters=None):
         metadata = MetaData()
@@ -294,6 +308,7 @@ class DBConnector:
             result = connection.execute(query)
             return result.fetchall()
 
+    @has_table_decorator
     @staticmethod
     def get_min_max_dates(engine, table, filters=None):
         metadata = MetaData()
@@ -309,6 +324,7 @@ class DBConnector:
 
             return [min_date, max_date]
 
+    @has_table_decorator
     @staticmethod
     def insert_row(engine, table, kwargs):
         metadata = MetaData()
@@ -325,6 +341,7 @@ class DBConnector:
             connection.execute(insert_stmt)
             connection.commit()
 
+    @has_table_decorator
     @staticmethod
     def delete_row(engine, table, condition):
         metadata = MetaData()
@@ -338,10 +355,11 @@ class DBConnector:
             connection.execute(delete_query)
             connection.commit()
 
+    @has_table_decorator
     @staticmethod
-    def drop_table(engine, table_name):
+    def drop_table(engine, table):
         metadata = MetaData()
-        table_ref = Table(table_name, metadata, autoload_with=engine)
+        table_ref = Table(table, metadata, autoload_with=engine)
 
         table_ref.drop(engine)
-        print(f"Table '{table_name}' has been dropped.")
+        print(f"Table '{table}' has been dropped.")

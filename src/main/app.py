@@ -1,7 +1,6 @@
 import os
 import dash
 import dash_mantine_components as dmc
-
 from src.helpers.layout import Layout
 import src.utils.callbacks
 
@@ -19,4 +18,5 @@ server = app.server
 
 
 if __name__ == "__main__":
-    app.run_server(debug=True, host="localhost", port=8000)
+
+    app.run_server(debug=True, host="0.0.0.0", port=8050)

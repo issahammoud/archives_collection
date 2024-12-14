@@ -56,3 +56,4 @@ onnx/
 *.png
 !logo.png
 *env/
+.env
