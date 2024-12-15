@@ -11,7 +11,6 @@ from src.helpers.db_connector import DBConnector
 
 
 logger = logging.getLogger(__name__)
-engine = DBConnector.get_engine(DBConnector.DBNAME)
 
 
 class DataCollector(ABC):
@@ -37,7 +36,9 @@ class DataCollector(ABC):
             date = self.begin_date + timedelta(days=day)
             all_dates.add(date)
 
-        done_dates = DBConnector.get_done_dates(engine, DBConnector.TABLE, archive)
+        done_dates = DBConnector.get_done_dates(
+            DBConnector.get_engine(), DBConnector.TABLE, archive
+        )
         done_dates = set([date.date() for date in done_dates])
         logger.info(f"{archive}: we already collected {len(done_dates)} pages.")
 
@@ -71,7 +72,9 @@ class DataCollector(ABC):
 
                     data[DBCOLUMNS.date] = date
                     data[DBCOLUMNS.rowid] = hash_url(data[DBCOLUMNS.link])
-                    DBConnector.insert_row(engine, DBConnector.TABLE, data)
+                    DBConnector.insert_row(
+                        DBConnector.get_engine(), DBConnector.TABLE, data
+                    )
                     logger.debug("Parsed a section successfully")
 
                 except Exception as e:

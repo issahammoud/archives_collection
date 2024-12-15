@@ -10,11 +10,9 @@ from src.helpers.enum import Archives, DBCOLUMNS
 from src.utils.utils import resize_image_for_html, convert_count_to_str
 
 
-engine = DBConnector.get_engine(DBConnector.DBNAME)
-
-
 class Graph:
     def get_graph(df, order):
+        value = df.columns[0]
         layout = go.Layout(
             xaxis=dict(
                 autorange=True,
@@ -29,9 +27,9 @@ class Graph:
         )
         fig = px.bar(
             df,
-            x="day",
+            x=value,
             y="count",
-            hover_data={"day": "|%B %d, %Y"},
+            hover_data={value: "|%B %d, %Y"},
         )
 
         fig.update_layout(layout)
@@ -41,23 +39,20 @@ class Graph:
         fig.update_traces(marker_color="#0097b2")
         graph = dcc.Graph(
             figure=fig,
-            style={"height": 60},
+            style={"height": 80},
             config={"displaylogo": False, "displayModeBar": False, "scrollZoom": True},
         )
         return graph
 
 
-class Layout:
-    SLIDES = 3
-    MAX_PAGES = 20
-
+class Header:
     @staticmethod
     def get_header():
         byte_img = open("assets/logo.png", "rb").read()
         src = "data:image/png;base64,{}".format(
             base64.b64encode(byte_img).decode("ascii")
         )
-        enroll_btn = Layout.get_enroll_btn()
+        enroll_btn = Header.get_enroll_btn()
         header = dmc.Grid(
             [
                 dmc.GridCol(
@@ -95,6 +90,8 @@ class Layout:
         )
         return a
 
+
+class Navbar:
     @staticmethod
     def filter_by_text():
         return dmc.TextInput(
@@ -127,14 +124,16 @@ class Layout:
 
     @staticmethod
     def filter_by_date():
-        min_max_dates = DBConnector.get_min_max_dates(engine, DBConnector.TABLE)
+        min_max_dates = DBConnector.get_min_max_dates(
+            DBConnector.get_engine(), DBConnector.TABLE
+        )
         min_max_dates = (
             min_max_dates if min_max_dates else [datetime.now(), datetime.now()]
         )
         date = dmc.DatePickerInput(
             id="date",
             label=dmc.Text("Date", c="dimmed", fw=300),
-            valueFormat="DD/MM/YY",
+            valueFormat="DD/MM/YYYY",
             allowSingleDateInRange=False,
             value=min_max_dates,
             type="range",
@@ -146,7 +145,7 @@ class Layout:
 
     @staticmethod
     def filter_by_tag():
-        tags = DBConnector.get_tags(engine, DBConnector.TABLE)
+        tags = DBConnector.get_tags(DBConnector.get_engine(), DBConnector.TABLE)
         tags = tags if tags else []
         tags = [tag.title() for tag in tags if tag and not tag.isnumeric()]
         select = dmc.Select(
@@ -219,22 +218,69 @@ class Layout:
             position="top",
         )
 
-        badge = Layout.get_badge(total_count)
-        return dmc.Group([badge, sorting, null_img], gap="xl", justify="center")
+        badge = Navbar.get_badge(total_count)
+
+        group_by = Navbar.group_by_btn()
+        return dmc.Grid(
+            [
+                dmc.GridCol(badge, span=3),
+                dmc.GridCol(sorting, span=3),
+                dmc.GridCol(null_img, span=3),
+                dmc.GridCol(group_by, span=3),
+            ]
+        )
+
+    @staticmethod
+    def group_by_btn():
+        target = dmc.Tooltip(
+            dmc.ActionIcon(
+                DashIconify(icon="ri:bar-chart-grouped-line", width=20),
+                variant="subtle",
+                color="#ff5757",
+            ),
+            label="group by",
+            withArrow=True,
+            openDelay=3,
+            position="top",
+        )
+        radio_group = (
+            dmc.RadioGroup(
+                children=dmc.Stack(
+                    [dmc.Radio(v, value=v) for v in ["day", "month", "year"]]
+                ),
+                id="groupby",
+                value="month",
+                size="xs",
+            ),
+        )
+        popover = dmc.Popover(
+            [
+                dmc.PopoverTarget(target),
+                dmc.PopoverDropdown(radio_group),
+            ],
+            position="bottom",
+            withArrow=True,
+            shadow="md",
+            id="popover",
+        )
+        return popover
 
     @staticmethod
     def get_navbar(total_count=None):
         total_count = (
             total_count
             if total_count
-            else DBConnector.get_total_count(engine, DBConnector.TABLE) or 0
+            else DBConnector.get_total_count(
+                DBConnector.get_engine(), DBConnector.TABLE
+            )
+            or 0
         )
 
-        date = Layout.filter_by_date()
-        tag = Layout.filter_by_tag()
-        text = Layout.filter_by_text()
-        archives = Layout.filter_by_archive()
-        switches = Layout.get_switches(total_count)
+        date = Navbar.filter_by_date()
+        tag = Navbar.filter_by_tag()
+        text = Navbar.filter_by_text()
+        archives = Navbar.filter_by_archive()
+        switches = Navbar.get_switches(total_count)
         drawer_control = dmc.ActionIcon(
             DashIconify(
                 icon="ic:round-navigate-next",
@@ -250,7 +296,7 @@ class Layout:
             style={
                 "position": "fixed",
                 "top": "50%",
-                "left": "calc(12% - 15px)",
+                "left": "calc(15% - 15px)",
                 "zIndex": 1000,
                 "transform": "rotate(180deg)",
                 "backgroundColor": "white",
@@ -273,15 +319,18 @@ class Layout:
                     withCloseButton=False,
                     opened=True,
                     withOverlay=False,
-                    size="12%",
+                    lockScroll=False,
+                    size="15%",
                     shadow="sm",
-                    keepMounted=False,
+                    keepMounted=True,
                     radius="sm",
                     offset="120px 0",
                 ),
             ]
         )
 
+
+class Main:
     @staticmethod
     def get_alert():
         return dmc.Container(
@@ -302,11 +351,9 @@ class Layout:
         stats_bar = dmc.Grid(
             [
                 dmc.GridCol(Graph.get_graph(df, order), span=12),
-            ],
-            justify="center",
-            align="flex-end",
+            ]
         )
-        return stats_bar
+        return dmc.Box(stats_bar, id="stats_bar")
 
     @staticmethod
     def get_card(rowid, byte_img, title, content, tag, archive, date, link):
@@ -408,7 +455,6 @@ class Layout:
             shadow="xs",
             radius="md",
         )
-        return card
         return html.A(
             children=card, href=link, target="_blank", style={"textDecoration": "none"}
         )
@@ -416,14 +462,14 @@ class Layout:
     @staticmethod
     def get_carousel_slides(args):
         return [
-            dmc.CarouselSlide(Layout.get_card(*args[i]), style={"width": "33.33%"})
+            dmc.CarouselSlide(Main.get_card(*args[i]), style={"width": "33.33%"})
             for i in range(len(args))
         ]
 
     @staticmethod
     def get_carousel(args):
         carousel = dmc.Carousel(
-            Layout.get_carousel_slides(args),
+            Main.get_carousel_slides(args),
             slideSize="33%",
             w="100%",
             id="carousel",
@@ -451,16 +497,21 @@ class Layout:
 
     @staticmethod
     def get_main(df, args, order):
-        stats = Layout.get_stats(df, order)
-        carousel = Layout.get_carousel(args)
+        stats = Main.get_stats(df, order)
+        carousel = Main.get_carousel(args)
         main = dmc.Stack([stats, carousel], gap="xl", align="stretch")
         return main
+
+
+class Layout:
+    SLIDES = 3
+    MAX_PAGES = 20
 
     @staticmethod
     def get_footer():
         return dmc.Box(
             dmc.Text(
-                "© Copyright Intuitive Deep Learning 2024. All rights reserved.",
+                "© Copyright Intuitive Deep Learning 2024.",
                 size="sm",
             ),
             mt=8,
@@ -469,9 +520,9 @@ class Layout:
 
     @staticmethod
     def get_layout():
-        header = Layout.get_header()
+        header = Header.get_header()
         footer = Layout.get_footer()
-        navbar = Layout.get_navbar()
+        navbar = Navbar.get_navbar()
         appshell = dmc.AppShell(
             [
                 dcc.Store(id="previous_active", data=0),
@@ -479,6 +530,7 @@ class Layout:
                     id="last_seen",
                     data={DBCOLUMNS.rowid: "", DBCOLUMNS.date: None, "direction": None},
                 ),
+                dcc.Store(id="states", data={}),
                 dmc.AppShellHeader(
                     dmc.Container(
                         header,
@@ -486,8 +538,18 @@ class Layout:
                     ),
                     withBorder=True,
                 ),
-                dmc.AppShellSection(dmc.Container(navbar, size="lg", p="lg")),
-                dmc.AppShellMain(dmc.Container(id="main", size="lg", p="lg")),
+                dmc.AppShellMain(
+                    dmc.Container(
+                        dmc.Grid(
+                            [
+                                dmc.GridCol(navbar, span=2),
+                                dmc.GridCol(id="main", span=10),
+                            ]
+                        ),
+                        size="90%",
+                        p="xl",
+                    )
+                ),
                 dmc.AppShellFooter(footer, withBorder=False),
             ],
             header={"height": 120},

@@ -19,11 +19,9 @@ from src.utils.utils import has_table_decorator
 
 
 class DBConnector:
-    DBNAME = (
-        f'postgresql://{os.getenv("POSTGRES_USER")}:'
-        f'{os.getenv("POSTGRES_PASSWORD")}@db:5432/{os.getenv("POSTGRES_DB")}'
-    )
+
     TABLE = "sections"
+    _engine = None
 
     operator_map = {
         "eq": lambda column, value: column == value,
@@ -41,9 +39,21 @@ class DBConnector:
     }
 
     @staticmethod
-    def get_engine(db_name=None, echo=False):
-        db_name = db_name or DBConnector.DBNAME
-        return create_engine(db_name, echo=echo)
+    def get_engine():
+        if DBConnector._engine is None:
+            user = os.getenv("POSTGRES_USER")
+            password = os.getenv("POSTGRES_PASSWORD")
+            db_name = os.getenv("POSTGRES_DB")
+            db_url = f"postgresql://{user}:{password}@db:5432/{db_name}"
+            # db_url = f"postgresql:///{db_name}"
+            assert None not in [
+                user,
+                password,
+                db_name,
+            ], "Failed to load the env variables"
+            DBConnector._engine = create_engine(db_url)
+
+        return DBConnector._engine
 
     @staticmethod
     def create_table(engine, table):
@@ -291,18 +301,19 @@ class DBConnector:
 
     @has_table_decorator
     @staticmethod
-    def group_by_day(engine, table, filters=None):
+    def group_by(engine, table, value, filters=None):
+        assert value in ["day", "month", "year"]
         metadata = MetaData()
         table_ref = Table(table, metadata, autoload_with=engine)
 
         with engine.connect() as connection:
             query = select(
-                func.date_trunc("day", table_ref.c.date).label("day"),
+                func.date_trunc(value, table_ref.c.date).label(value),
                 func.count(table_ref.c.rowid).label("count"),
             )
             query = DBConnector.apply_filters(query, table_ref, filters)
-            query = query.group_by(func.date_trunc("day", table_ref.c.date)).order_by(
-                func.date_trunc("day", table_ref.c.date)
+            query = query.group_by(func.date_trunc(value, table_ref.c.date)).order_by(
+                func.date_trunc(value, table_ref.c.date)
             )
 
             result = connection.execute(query)

@@ -18,5 +18,5 @@ RUN pre-commit install
 
 EXPOSE 8050
 
-# CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:8050", "--reload", "src.main.app:app"]
-CMD ["python3", "src/main/app.py"]
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8050", "src.main.app:app"]
+# CMD ["python3", "src/main/app.py"]

@@ -24,7 +24,6 @@ from src.data_scrapping.collectors import (
 
 
 logger = logging.getLogger(__name__)
-engine = DBConnector.get_engine(DBConnector.DBNAME)
 
 
 class CollectorFactory:
@@ -75,13 +74,13 @@ class CollectorFactory:
                 break
 
     def run(self):
-        DBConnector.create_table(engine, DBConnector.TABLE)
+        DBConnector.create_table(DBConnector.get_engine(), DBConnector.TABLE)
         urls = self.get_all_url()
 
         count_before = {}
         for name in self.collectors_names:
             count_before[name] = DBConnector.get_archive_count(
-                engine, DBConnector.TABLE, name
+                DBConnector.get_engine(), DBConnector.TABLE, name
             )
 
         logger.info(f"Getting the data for {len(urls)} dates")
@@ -97,7 +96,9 @@ class CollectorFactory:
         end = np.round((time.time() - start) / 60, 2)
 
         for name in self.collectors_names:
-            rows_nb = DBConnector.get_archive_count(engine, DBConnector.TABLE, name)
+            rows_nb = DBConnector.get_archive_count(
+                DBConnector.get_engine(), DBConnector.TABLE, name
+            )
             diff = rows_nb - count_before[name]
             logger.info(
                 f"\nFor {name}:\n"
