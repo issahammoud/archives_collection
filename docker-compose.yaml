@@ -1,12 +1,10 @@
 services:
-  app:
+  webapp:
     build:
-      context: .
+      context: webapp/
       dockerfile: Dockerfile
     ports:
       - "8050:8050"
-    volumes:
-      - .:/app
     depends_on:
       - db
     env_file:
@@ -21,6 +19,15 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  precommit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/workspace
+      - .git:/workspace/.git
+    working_dir: /workspace
 
 volumes:
   postgres_data:

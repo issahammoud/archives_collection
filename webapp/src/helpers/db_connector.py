@@ -45,7 +45,6 @@ class DBConnector:
             password = os.getenv("POSTGRES_PASSWORD")
             db_name = os.getenv("POSTGRES_DB")
             db_url = f"postgresql://{user}:{password}@db:5432/{db_name}"
-            # db_url = f"postgresql:///{db_name}"
             assert None not in [
                 user,
                 password,

@@ -1,22 +1,16 @@
 FROM python:3.10-slim
 
-WORKDIR /app
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && \
-    apt-get install -y \
-    git \
-    libmagickwand-dev && \
-    rm -rf /var/lib/apt/lists/*
+WORKDIR /workspace
 
-ENV PYTHONPATH=/app
+COPY . /workspace
 
-COPY . /app/
+# Install pre-commit
+RUN pip install pre-commit black flake8
 
-RUN pip install --no-cache-dir -r install_tools/requirements.txt
+RUN if [ -d ".git" ]; then git config --global --add safe.directory /workspace; fi
 
 RUN pre-commit install
 
-EXPOSE 8050
-
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8050", "src.main.app:app"]
-# CMD ["python3", "src/main/app.py"]
+CMD ["pre-commit", "run", "--all-files"]
