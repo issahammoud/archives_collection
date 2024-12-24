@@ -166,7 +166,7 @@ class Navbar:
 
     @staticmethod
     def get_badge(count):
-        full_str, approx = convert_count_to_str(count)
+        approx = convert_count_to_str(count)
         badge = dmc.Tooltip(
             dmc.Badge(
                 dmc.Text(approx, fw=300, size="xs"),
@@ -178,7 +178,7 @@ class Navbar:
                 p=2,
             ),
             id="badge",
-            label=f"{full_str} articles",
+            label=f"{count:,}",
             multiline=True,
             withArrow=True,
             openDelay=3,
@@ -197,7 +197,7 @@ class Navbar:
         )
         sorting = dmc.Tooltip(
             sorting,
-            label="Inverse date order",
+            label="date order",
             multiline=True,
             withArrow=True,
             openDelay=3,
@@ -211,7 +211,7 @@ class Navbar:
         )
         null_img = dmc.Tooltip(
             null_img,
-            label="Eliminate empty images",
+            label="empty images",
             multiline=True,
             withArrow=True,
             openDelay=3,

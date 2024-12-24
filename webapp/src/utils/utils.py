@@ -4,6 +4,7 @@ import itertools
 import numpy as np
 from functools import wraps
 from sqlalchemy import inspect
+from spellchecker import SpellChecker
 from wand.image import Image as WandImage
 
 
@@ -44,18 +45,17 @@ def resize_image_for_html(image_bytes, target_height=300):
 
 
 def convert_count_to_str(count):
-    full_str = f"{count:,}"
     if count >= 1000000:
         if not count % 1000000:
-            return full_str, f"{count // 1000000}M"
-        return full_str, f"{round(count / 1000000, 1)}M"
+            return f"{count // 1000000}M"
+        return f"{round(count / 1000000, 1)}M"
 
     if count >= 1000:
         if not count % 1000:
-            return full_str, f"{count // 1000}K"
-        return full_str, f"{round(count / 1000, 1)}K"
+            return f"{count // 1000}K"
+        return f"{round(count / 1000, 1)}K"
 
-    return full_str, count
+    return count
 
 
 def has_table_decorator(func):
@@ -76,3 +76,19 @@ def has_table_decorator(func):
         return func(*args, **kwargs)
 
     return wrapper
+
+
+def prepare_query(query):
+    concatenated_words = []
+    spell = SpellChecker()
+    words = query.split()
+
+    new_words = [spell.correction(word) for word in words]
+
+    for word1, word2 in zip(words, new_words):
+        if word2:
+            concatenated_words.append(f"({word1} | {word2})")
+        else:
+            concatenated_words.append(word1)
+
+    return " & ".join(concatenated_words)

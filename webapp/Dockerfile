@@ -4,7 +4,6 @@ WORKDIR /webapp
 
 RUN apt-get update && \
     apt-get install -y \
-    git \
     libmagickwand-dev && \
     rm -rf /var/lib/apt/lists/*
 

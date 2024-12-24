@@ -8,9 +8,12 @@ from sqlalchemy import (
     func,
     text,
     Index,
+    update,
+    bindparam,
     PrimaryKeyConstraint,
 )
 from sqlalchemy.sql import and_
+from pgvector.sqlalchemy import Vector
 from sqlalchemy.types import String, DateTime, LargeBinary
 
 
@@ -70,6 +73,9 @@ class DBConnector:
                 Column(DBCOLUMNS.content.value, String, nullable=True),
                 Column(DBCOLUMNS.tag.value, String, nullable=True),
                 Column(DBCOLUMNS.link.value, String, nullable=False, unique=True),
+                Column(
+                    DBCOLUMNS.embedding.value, Vector(768), nullable=False, unique=True
+                ),
                 PrimaryKeyConstraint(DBCOLUMNS.rowid.value),
             )
 
@@ -336,19 +342,34 @@ class DBConnector:
 
     @has_table_decorator
     @staticmethod
-    def insert_row(engine, table, kwargs):
+    def insert_row(engine, table, values):
         metadata = MetaData()
         table_ref = Table(table, metadata, autoload_with=engine)
 
-        insert_stmt = table_ref.insert().values(**kwargs)
+        insert_stmt = table_ref.insert().values(values)
 
         if "postgresql" in str(engine.url):
             from sqlalchemy.dialects.postgresql import insert
 
-            insert_stmt = insert(table_ref).values(**kwargs).on_conflict_do_nothing()
+            insert_stmt = insert(table_ref).values(values).on_conflict_do_nothing()
 
         with engine.connect() as connection:
             connection.execute(insert_stmt)
+            connection.commit()
+
+    @has_table_decorator
+    @staticmethod
+    def update_embedding(engine, table, values):
+        metadata = MetaData()
+        table_ref = Table(table, metadata, autoload_with=engine)
+        keys = list(values[0].keys())
+        stmt = (
+            update(table_ref)
+            .where(table_ref.c[DBCOLUMNS.rowid] == bindparam(keys[0]))
+            .values({DBCOLUMNS.embedding: bindparam(keys[1])})
+        )
+        with engine.connect() as connection:
+            connection.execute(stmt, values)
             connection.commit()
 
     @has_table_decorator

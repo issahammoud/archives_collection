@@ -1,4 +1,5 @@
 services:
+
   webapp:
     build:
       context: webapp/
@@ -7,11 +8,15 @@ services:
       - "8050:8050"
     depends_on:
       - db
+      - embedding
     env_file:
       - .env
+    volumes:
+      - ./webapp/:/webapp
+
 
   db:
-    image: postgres:14
+    image: pgvector/pgvector:pg14
     container_name: postgres_container
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -19,6 +24,23 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+  embedding:
+    build:
+      context: embedding/
+      dockerfile: Dockerfile
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./embedding/:/embedding
 
   precommit:
     build:

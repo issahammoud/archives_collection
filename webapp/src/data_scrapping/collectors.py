@@ -347,3 +347,79 @@ class LHumanite(DataCollector):
             DBCOLUMNS.archive: self.archive,
         }
         return data
+
+
+class LePoint(DataCollector):
+    def __init__(self, begin_date, end_date, timeout):
+        url_format = "https://www.lepoint.fr/archives/{}.php"
+        self._base_url = "https://www.lepoint.fr"
+
+        self.archive = Archives.lepoint
+        self.content_selector = "main > article"
+        self.min_date = datetime.strptime("01-05-2010", "%d-%m-%Y").date()
+        date2str = partial(format_datetime, format="MM-Y/dd")
+        self.has_multiple_pages = False
+        super().__init__(url_format, date2str, begin_date, end_date, timeout)
+
+    def parse_single_section(self, section):
+        section_url = self._base_url + section.a.get("href")
+        url_content = self.get_url_content(section_url)
+        section_content = BeautifulSoup(url_content, "html.parser")
+
+        try:
+            figure_url = section_content.figure.img.get("src")
+            image = self.get_url_content(figure_url)
+        except Exception:
+            image = None
+        title = section_content.h1.text.strip()
+
+        content = section_content.select("div#contenu")[0].text.strip()
+        tag = section_content.select("main > ul > li")[0].text.strip()
+
+        data = {
+            DBCOLUMNS.image: image,
+            DBCOLUMNS.title: title,
+            DBCOLUMNS.content: content,
+            DBCOLUMNS.tag: tag,
+            DBCOLUMNS.link: section_url,
+            DBCOLUMNS.archive: self.archive,
+        }
+        return data
+    
+
+class LOrient(DataCollector):
+    def __init__(self, begin_date, end_date, timeout):
+        url_format = "https://www.lorientlejour.com/seo.php?date={}"
+        self._base_url = "https://www.lorientlejour.com/"
+
+        self.archive = Archives.lorient
+        self.content_selector = "ul > li"
+        self.min_date = datetime.strptime("01-01-1997", "%d-%m-%Y").date()
+        date2str = partial(format_datetime, format="Y-MM-dd")
+        self.has_multiple_pages = False
+        super().__init__(url_format, date2str, begin_date, end_date, timeout)
+
+    def parse_single_section(self, section):
+        section_url = self._base_url + section.a.get("href")
+        url_content = self.get_url_content(section_url)
+        section_content = BeautifulSoup(url_content, "html.parser")
+
+        try:
+            figure_url = section_content.figure.img.get("src")
+            image = self.get_url_content(figure_url)
+        except Exception:
+            image = None
+        title = section_content.h1.text.strip()
+
+        content = section_content.select("div#contenu")[0].text.strip()
+        tag = section_content.h3.text.strip()
+
+        data = {
+            DBCOLUMNS.image: image,
+            DBCOLUMNS.title: title,
+            DBCOLUMNS.content: content,
+            DBCOLUMNS.tag: tag,
+            DBCOLUMNS.link: section_url,
+            DBCOLUMNS.archive: self.archive,
+        }
+        return data

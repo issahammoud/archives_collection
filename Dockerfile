@@ -6,7 +6,6 @@ WORKDIR /workspace
 
 COPY . /workspace
 
-# Install pre-commit
 RUN pip install pre-commit black flake8
 
 RUN if [ -d ".git" ]; then git config --global --add safe.directory /workspace; fi

@@ -3,10 +3,10 @@ import pandas as pd
 from dash.exceptions import PreventUpdate
 from dash import Input, State, Output, callback
 
-
-from src.helpers.layout import Layout, Navbar, Main
 from src.helpers.enum import DBCOLUMNS
+from src.utils.utils import prepare_query
 from src.helpers.db_connector import DBConnector
+from src.helpers.layout import Layout, Navbar, Main
 
 
 def get_filters_dict(archive, tag, date_range, submit, null_clicks, query):
@@ -19,7 +19,9 @@ def get_filters_dict(archive, tag, date_range, submit, null_clicks, query):
     filters.update({DBCOLUMNS.archive: [("in", archive)]} if archive else {})
 
     filters.update(
-        {DBCOLUMNS.text_searchable: [("text_search", " & ".join(query.split()))]}
+        {
+            DBCOLUMNS.text_searchable: [("text_search", prepare_query(query))],
+        }
         if submit and query
         else {}
     )
