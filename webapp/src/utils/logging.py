@@ -13,7 +13,7 @@ LOGGING_CONFIG = {
             "level": "INFO",
             "formatter": "standard",
             "class": "logging.StreamHandler",
-            "stream": "ext://sys.stdout",  # Default is stderr
+            "stream": "ext://sys.stdout",
         },
         "file": {
             "level": "DEBUG",
@@ -21,13 +21,15 @@ LOGGING_CONFIG = {
             "formatter": "standard",
             "filename": "logs.log",
             "class": "logging.handlers.RotatingFileHandler",
+            "maxBytes": 1000000000,
+            "backupCount": 20,
         },
     },
     "loggers": {
         "": {"handlers": ["default", "file"], "level": "DEBUG", "propagate": False},
         "__main__": {
             "handlers": ["default", "file"],
-            "level": "DEBUG",
+            "level": "INFO",
             "propagate": False,
         },
     },

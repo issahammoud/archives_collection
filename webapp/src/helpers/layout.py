@@ -9,6 +9,8 @@ from src.helpers.db_connector import DBConnector
 from src.helpers.enum import Archives, DBCOLUMNS
 from src.utils.utils import resize_image_for_html, convert_count_to_str
 
+engine = DBConnector.get_engine()
+
 
 class Graph:
     def get_graph(df, order):
@@ -56,7 +58,7 @@ class Header:
         header = dmc.Grid(
             [
                 dmc.GridCol(
-                    html.Div(dmc.Image(fallbackSrc=src), style={"width": 120}), span=2
+                    html.Div(dmc.Image(fallbackSrc=src), style={"width": 100}), span=2
                 ),
                 dmc.GridCol(enroll_btn, span=1, offset=9),
             ],
@@ -124,9 +126,7 @@ class Navbar:
 
     @staticmethod
     def filter_by_date():
-        min_max_dates = DBConnector.get_min_max_dates(
-            DBConnector.get_engine(), DBConnector.TABLE
-        )
+        min_max_dates = DBConnector.get_min_max_dates(engine, DBConnector.TABLE)
         min_max_dates = (
             min_max_dates if min_max_dates else [datetime.now(), datetime.now()]
         )
@@ -145,7 +145,7 @@ class Navbar:
 
     @staticmethod
     def filter_by_tag():
-        tags = DBConnector.get_tags(DBConnector.get_engine(), DBConnector.TABLE)
+        tags = DBConnector.get_tags(engine, DBConnector.TABLE)
         tags = tags if tags else []
         tags = [tag.title() for tag in tags if tag and not tag.isnumeric()]
         select = dmc.Select(
@@ -178,7 +178,7 @@ class Navbar:
                 p=2,
             ),
             id="badge",
-            label=f"{count:,}",
+            label=f"{count} articles",
             multiline=True,
             withArrow=True,
             openDelay=3,
@@ -270,10 +270,7 @@ class Navbar:
         total_count = (
             total_count
             if total_count
-            else DBConnector.get_total_count(
-                DBConnector.get_engine(), DBConnector.TABLE
-            )
-            or 0
+            else DBConnector.get_total_count(engine, DBConnector.TABLE) or 0
         )
 
         date = Navbar.filter_by_date()
@@ -324,7 +321,7 @@ class Navbar:
                     shadow="sm",
                     keepMounted=True,
                     radius="sm",
-                    offset="120px 0",
+                    offset="100px 0",
                 ),
             ]
         )
@@ -552,7 +549,7 @@ class Layout:
                 ),
                 dmc.AppShellFooter(footer, withBorder=False),
             ],
-            header={"height": 120},
+            header={"height": 100},
             footer={"height": 60},
         )
         return dmc.MantineProvider(appshell)

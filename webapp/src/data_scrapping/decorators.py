@@ -1,6 +1,9 @@
 import os
 import logging
-from bs4 import BeautifulSoup
+
+from src.utils.utils import hash_url
+from src.helpers.enum import DBCOLUMNS
+from src.helpers.db_connector import DBConnector
 from src.data_scrapping.data_collector import DataCollector
 
 
@@ -19,27 +22,34 @@ class Decorator(DataCollector):
             collector.timeout,
         )
 
-    def get_all_url(self, archive):
-        return self._collector.get_all_url(archive)
+    def match_format(self, url):
+        return self._collector.match_format(url)
+
+    def get_all_url(self):
+        return self._collector.get_all_url()
 
     def get_url_content(self, url):
         return self._collector.get_url_content(url)
 
-    def parse_single_page(self, date, url, content_selector):
-        return self._collector.parse_single_page(date, url, content_selector)
+    def get_sections(self, url):
+        return self._collector.get_sections(url)
 
-    def parse_single_section(self, section):
-        return self._collector.parse_single_section(section)
+    def parse_single_page(self, date, url):
+        return self._collector.parse_single_page(date, url)
+
+    def parse_single_section(self, section, section_url):
+        return self._collector.parse_single_section(section, section_url)
+
+    def get_section_url(self, section):
+        return self._collector.get_section_url(section)
 
 
 class AddPages(Decorator):
     def __init__(self, collector):
         super().__init__(collector)
 
-    def _get_max_page(self, url):
+    def _get_max_page(self, parsed_content):
         try:
-            content = self._collector.get_url_content(url)
-            parsed_content = BeautifulSoup(content, "html.parser")
             selected = parsed_content.select(self._collector.page_selector)
             pages = [
                 int(el.text.strip()) for el in selected if el.text.strip().isnumeric()
@@ -49,25 +59,42 @@ class AddPages(Decorator):
             logger.debug(e)
             return 0
 
-    def get_all_url(self, archive):
-        new_urls = []
-        all_urls = self._collector.get_all_url(archive)
+    def get_sections(self, url):
+        sections, parsed_content = self._collector.get_sections(url)
         if not hasattr(self._collector, "page_selector"):
-            return all_urls
+            return sections, None
 
-        for date, url in all_urls:
-            max_page = self._get_max_page(url)
-            for page in range(max_page):
-                if page + 1 == 1:
-                    new_urls.append((date, url))
-                else:
-                    new_urls.append(
-                        (
-                            date,
-                            os.path.join(
-                                url, self._collector.page_url_suffix.format(page + 1)
-                            ),
-                        )
-                    )
+        max_page = self._get_max_page(parsed_content)
+        logger.debug(f"There are {max_page} pages to add")
+        for page in range(2, max_page + 1):
+            try:
+                new_url = os.path.join(
+                    url, self._collector.page_url_suffix.format(page)
+                )
+                new_sections, _ = self._collector.get_sections(new_url)
+                sections += new_sections
+            except:
+                return sections, None
 
-        return new_urls
+        return sections, None
+
+
+class EliminateRedundancy(Decorator):
+    def __init__(self, collector):
+        super().__init__(collector)
+        self._done = None
+
+    def _lazy_load_rowids(self):
+        if self._done is None:
+            self._done = set(
+                DBConnector.get_all_rowid(
+                    self.engine,
+                    DBConnector.TABLE,
+                    filters={DBCOLUMNS.archive: [("eq", self._collector.archive)]},
+                )
+            )
+
+    def get_section_url(self, section):
+        self._lazy_load_rowids()
+        url = self._collector.get_section_url(section)
+        return None if hash_url(url) in self._done else url

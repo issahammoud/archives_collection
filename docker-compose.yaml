@@ -4,11 +4,12 @@ services:
     build:
       context: webapp/
       dockerfile: Dockerfile
+    container_name: webapp_container
     ports:
       - "8050:8050"
     depends_on:
       - db
-      - embedding
+      # - embedding
     env_file:
       - .env
     volumes:
@@ -16,36 +17,42 @@ services:
 
 
   db:
-    image: pgvector/pgvector:pg14
+    image: postgres:14
     container_name: postgres_container
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+      nproc: 65535
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
 
-  embedding:
-    build:
-      context: embedding/
-      dockerfile: Dockerfile
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./embedding/:/embedding
+  # embedding:
+  #   build:
+  #     context: embedding/
+  #     dockerfile: Dockerfile
+  #   container_name: embedding_container
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - ./embedding/:/embedding
 
   precommit:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: precommit_container
     volumes:
       - .:/workspace
       - .git:/workspace/.git

@@ -1,8 +1,10 @@
+import warnings
 from src.utils.logging import logging
 from src.utils.parser import get_config
 from src.data_scrapping.collector_factory import CollectorFactory
 
 logger = logging.getLogger(__name__)
+warnings.filterwarnings("ignore")
 
 
 if __name__ == "__main__":
@@ -10,7 +12,7 @@ if __name__ == "__main__":
 
     collector = CollectorFactory(
         config.archives,
-        len(config.archives),
+        config.workers,
         begin_date=config.begin_date,
         end_date=config.end_date,
         timeout=config.timeout,

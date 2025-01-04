@@ -1,6 +1,8 @@
+import re
 import logging
-import requests
 import dateparser
+import numpy as np
+import cloudscraper
 from bs4 import BeautifulSoup
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, date
@@ -8,7 +10,7 @@ from datetime import datetime, timedelta, date
 from src.utils.utils import hash_url
 from src.helpers.enum import DBCOLUMNS, headers
 from src.helpers.db_connector import DBConnector
-
+from src.data_scrapping.strategy import StrategyFactory
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,16 @@ class DataCollector(ABC):
         self.begin_date = max(self.begin_date, self.min_date)
         self.end_date = self._convert_to_date(end_date)
         self.timeout = timeout
+        self._translation_table = str.maketrans("éàèùâêîôûç", "eaeuaeiouc")
+        self._fetch_strategy = StrategyFactory(self)
+        self.engine = None
+
+    def _init_engine(self):
+        if self.engine is None:
+            self.engine = DBConnector.get_engine()
+
+    def match_format(self, url):
+        return bool(re.match(self.url_format.replace("?", "\?").format(".*"), url))
 
     def _convert_to_date(self, str_date):
         if str_date is not None:
@@ -30,60 +42,78 @@ class DataCollector(ABC):
             return dateparser.parse(str_date, ["%d-%m-%Y"]).date()
         return datetime.now().date()
 
-    def get_all_url(self, archive):
-        all_dates = set()
+    def get_all_url(self):
+        all_dates = []
         for day in range((self.end_date - self.begin_date + timedelta(days=1)).days):
             date = self.begin_date + timedelta(days=day)
-            all_dates.add(date)
+            all_dates.append(date)
 
-        done_dates = DBConnector.get_done_dates(
-            DBConnector.get_engine(), DBConnector.TABLE, archive
-        )
-        done_dates = set([date.date() for date in done_dates])
-        logger.info(f"{archive}: we already collected {len(done_dates)} pages.")
-
-        remaining_dates = all_dates - done_dates
-        logger.info(f"{archive}: There are {len(remaining_dates)} pages to collect.")
-
-        remaining_dates = sorted(remaining_dates)[::-1]
+        np.random.shuffle(all_dates)
         all_urls = [
-            (date, self.url_format.format(self.date2str(date)))
-            for date in remaining_dates
+            (
+                date,
+                self.url_format.format(
+                    self.date2str(date).translate(self._translation_table)
+                ),
+            )
+            for date in all_dates
         ]
         return all_urls
 
     def get_url_content(self, url):
-        req = requests.get(url, timeout=self.timeout, headers=headers)
-        assert (
-            req.status_code == 200
-        ), f"URL {url} not found, error code {req.status_code}"
-        return req.content
+        return self._fetch_strategy.get_url_content(url)
+
+    def get_sections(self, url):
+        content = self.get_url_content(url)
+        parsed_content = BeautifulSoup(content, "html.parser")
+        sections = parsed_content.select(self.content_selector)
+        return sections, parsed_content
 
     def parse_single_page(self, date, url):
+        self._init_engine()
         try:
-            content = self.get_url_content(url)
-            parsed_content = BeautifulSoup(content, "html.parser")
-            sections = parsed_content.select(self.content_selector)
+            sections, _ = self.get_sections(url)
             logger.debug(f"Page {url} contains {len(sections)} sections")
-
+            data_list = []
             for section in sections:
                 try:
-                    data = self.parse_single_section(section)
+                    section_url = self.get_section_url(section)
+                    if section_url is not None and not self.match_format(section_url):
+                        data = self.parse_single_section(section, section_url)
 
-                    data[DBCOLUMNS.date] = date
-                    data[DBCOLUMNS.rowid] = hash_url(data[DBCOLUMNS.link])
-                    DBConnector.insert_row(
-                        DBConnector.get_engine(), DBConnector.TABLE, data
-                    )
-                    logger.debug("Parsed a section successfully")
+                        data[DBCOLUMNS.date] = date
+                        data[DBCOLUMNS.link] = section_url
+                        data[DBCOLUMNS.rowid] = hash_url(section_url)
+                        logger.debug(f"[{self.archive}]: Parsed a section successfully")
+                        data_list.append(data)
+
+                        if len(data_list) > 10:
+                            DBConnector.insert_row(
+                                self.engine, DBConnector.TABLE, data_list
+                            )
+                            data_list = []
 
                 except Exception as e:
                     logger.debug(f"Exception in parsing section from page {url}")
                     logger.debug(e)
+                    if len(data_list):
+                        DBConnector.insert_row(
+                            self.engine, DBConnector.TABLE, data_list
+                        )
+                        data_list = []
+
+            if len(data_list):
+                DBConnector.insert_row(self.engine, DBConnector.TABLE, data_list)
+                data_list = []
+
         except Exception as e:
             logger.debug(f"Exception in parsing page {url}")
             logger.debug(e)
 
     @abstractmethod
-    def parse_single_section(self, section):
+    def get_section_url(self, section):
+        raise NotImplementedError
+
+    @abstractmethod
+    def parse_single_section(self, section, section_url):
         raise NotImplementedError

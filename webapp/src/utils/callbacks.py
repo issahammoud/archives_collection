@@ -8,6 +8,8 @@ from src.utils.utils import prepare_query
 from src.helpers.db_connector import DBConnector
 from src.helpers.layout import Layout, Navbar, Main
 
+engine = DBConnector.get_engine()
+
 
 def get_filters_dict(archive, tag, date_range, submit, null_clicks, query):
     filters = {DBCOLUMNS.date: [("ge", date_range[0])]}
@@ -67,13 +69,9 @@ def create_content(
         "groupby": value,
     }
 
-    df = pd.DataFrame(
-        DBConnector.group_by(
-            DBConnector.get_engine(), DBConnector.TABLE, value, filters
-        )
-    )
+    df = pd.DataFrame(DBConnector.group_by(engine, DBConnector.TABLE, value, filters))
     args = DBConnector.fetch_data_keyset(
-        DBConnector.get_engine(),
+        engine,
         DBConnector.TABLE,
         limit=Layout.SLIDES * Layout.MAX_PAGES,
         filters=filters,
@@ -89,9 +87,7 @@ def create_content(
         ],
         desc_order=order,
     )
-    total_count = DBConnector.get_total_count(
-        DBConnector.get_engine(), DBConnector.TABLE, filters
-    )
+    total_count = DBConnector.get_total_count(engine, DBConnector.TABLE, filters)
     badge = Navbar.get_badge(total_count)
     if len(args) > Layout.SLIDES:
         last_seen = {
@@ -139,7 +135,7 @@ def update_carousel(active, previous_active, last_seen, states):
         ) and previous_active != 0:
 
             args = DBConnector.fetch_data_keyset(
-                DBConnector.get_engine(),
+                engine,
                 DBConnector.TABLE,
                 limit=Layout.SLIDES * Layout.MAX_PAGES,
                 filters=filters,
@@ -216,9 +212,7 @@ def group_by(value, states):
         filters = get_filters_dict(archive, tag, date_range, True, null_clicks, query)
 
         df = pd.DataFrame(
-            DBConnector.group_by(
-                DBConnector.get_engine(), DBConnector.TABLE, value, filters
-            )
+            DBConnector.group_by(engine, DBConnector.TABLE, value, filters)
         )
         return Main.get_stats(df, not order), False
     raise PreventUpdate

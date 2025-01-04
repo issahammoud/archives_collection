@@ -1,5 +1,0 @@
-[flake8]
-ignore = E226,E302,E41,W503,W605
-max-line-length = 88
-max-complexity = 10
-per-file-ignores = app.py:F401

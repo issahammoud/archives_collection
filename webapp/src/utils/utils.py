@@ -1,3 +1,4 @@
+import re
 import base64
 import hashlib
 import itertools
@@ -92,3 +93,10 @@ def prepare_query(query):
             concatenated_words.append(word1)
 
     return " & ".join(concatenated_words)
+
+
+def is_image_url(url):
+    image_pattern = re.compile(
+        r"\.(jpg|jpeg|png|gif|bmp|svg|webp|tiff)$", re.IGNORECASE
+    )
+    return bool(image_pattern.search(url))

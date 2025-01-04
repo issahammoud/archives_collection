@@ -13,18 +13,18 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
 )
 from sqlalchemy.sql import and_
-from pgvector.sqlalchemy import Vector
 from sqlalchemy.types import String, DateTime, LargeBinary
 
-
+from src.utils.logging import logging
 from src.helpers.enum import DBCOLUMNS
 from src.utils.utils import has_table_decorator
+
+logger = logging.getLogger(__name__)
 
 
 class DBConnector:
 
     TABLE = "sections"
-    _engine = None
 
     operator_map = {
         "eq": lambda column, value: column == value,
@@ -43,19 +43,23 @@ class DBConnector:
 
     @staticmethod
     def get_engine():
-        if DBConnector._engine is None:
-            user = os.getenv("POSTGRES_USER")
-            password = os.getenv("POSTGRES_PASSWORD")
-            db_name = os.getenv("POSTGRES_DB")
-            db_url = f"postgresql://{user}:{password}@db:5432/{db_name}"
-            assert None not in [
-                user,
-                password,
-                db_name,
-            ], "Failed to load the env variables"
-            DBConnector._engine = create_engine(db_url)
-
-        return DBConnector._engine
+        user = os.getenv("POSTGRES_USER")
+        password = os.getenv("POSTGRES_PASSWORD")
+        db_name = os.getenv("POSTGRES_DB")
+        db_url = f"postgresql://{user}:{password}@db:5432/{db_name}"
+        assert None not in [
+            user,
+            password,
+            db_name,
+        ], "Failed to load the env variables"
+        return create_engine(
+            db_url,
+            pool_size=11,
+            max_overflow=20,
+            pool_timeout=30,
+            pool_recycle=1800,
+            pool_pre_ping=True,
+        )
 
     @staticmethod
     def create_table(engine, table):
@@ -73,9 +77,6 @@ class DBConnector:
                 Column(DBCOLUMNS.content.value, String, nullable=True),
                 Column(DBCOLUMNS.tag.value, String, nullable=True),
                 Column(DBCOLUMNS.link.value, String, nullable=False, unique=True),
-                Column(
-                    DBCOLUMNS.embedding.value, Vector(768), nullable=False, unique=True
-                ),
                 PrimaryKeyConstraint(DBCOLUMNS.rowid.value),
             )
 
@@ -163,12 +164,26 @@ class DBConnector:
         table_ref = Table(table, metadata, autoload_with=engine)
 
         with engine.connect() as connection:
-            query = select(table_ref.c.date).where(table_ref.c.archive == archive)
+            query = select(table_ref.c[DBCOLUMNS.date]).where(
+                table_ref.c[DBCOLUMNS.archive] == archive
+            )
 
             query = DBConnector.apply_filters(query, table_ref, filters)
 
             query = query.distinct()
 
+            result = connection.execute(query)
+            return [row[0] for row in result]
+
+    @has_table_decorator
+    @staticmethod
+    def get_all_rowid(engine, table, filters=None):
+        metadata = MetaData()
+        table_ref = Table(table, metadata, autoload_with=engine)
+
+        with engine.connect() as connection:
+            query = select(table_ref.c[DBCOLUMNS.rowid])
+            query = DBConnector.apply_filters(query, table_ref, filters)
             result = connection.execute(query)
             return [row[0] for row in result]
 
@@ -356,6 +371,7 @@ class DBConnector:
         with engine.connect() as connection:
             connection.execute(insert_stmt)
             connection.commit()
+        logger.debug(f"inserted {len(values)} rows")
 
     @has_table_decorator
     @staticmethod
@@ -393,4 +409,3 @@ class DBConnector:
         table_ref = Table(table, metadata, autoload_with=engine)
 
         table_ref.drop(engine)
-        print(f"Table '{table}' has been dropped.")

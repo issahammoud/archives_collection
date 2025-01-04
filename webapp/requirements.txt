@@ -11,7 +11,6 @@ dash==2.15
 dash-mantine-components==0.15
 dash-iconify==0.1.2
 SQLAlchemy==2.0.29
-pgvector==0.3.6
 opencv-python==4.9.0.80
 psycopg2-binary==2.9.9
 dateparser==1.2.0
@@ -20,3 +19,5 @@ python-dotenv==1.0.1
 pyspellchecker==0.8.2
 aiohttp==3.11.11
 orjson==3.10.12
+cloudscraper==1.2.71
+selenium==4.27.1

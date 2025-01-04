@@ -17,27 +17,31 @@ class LeMonde(DataCollector):
         self.content_selector = "section#river > section.teaser"
         self.min_date = datetime.strptime("19-12-1944", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="dd-MM-Y")
-        self.has_multiple_pages = True
         self.page_selector = "section.river__pagination > a"
-        self.page_url_suffix = "/{}/"
+        self.page_url_suffix = "{}/"
+        self.is_dynamic = {"page": False, "section": False}
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
-    def parse_single_section(self, section):
+    def get_section_url(self, section):
+        return section.a.get("href")
+
+    def parse_single_section(self, section, section_url):
         try:
             figure_url = section.figure.picture.source.get("data-srcset")
             image = self.get_url_content(figure_url)
         except Exception:
             image = None
-        title = section.a.h3.text.strip()
-        content = section.a.p.text.strip()
-        tag = section.a.span.text.strip().title()
-        section_url = section.a.get("href")
+        title = section.h3.text.strip()
+        content = section.p.text.strip()
+        try:
+            tag = section.span.a.text.strip()
+        except:
+            tag = None
         data = {
             DBCOLUMNS.image: image,
             DBCOLUMNS.title: title,
             DBCOLUMNS.content: content,
             DBCOLUMNS.tag: tag,
-            DBCOLUMNS.link: section_url,
             DBCOLUMNS.archive: self.archive,
         }
         return data
@@ -52,26 +56,26 @@ class LeFigaro(DataCollector):
         self.content_selector = "#articles-list > article"
         self.min_date = datetime.strptime("01-01-2005", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="dd-MM-Y")
-        self.has_multiple_pages = False
-
+        self.is_dynamic = {"page": True, "section": False}
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
-    def parse_single_section(self, section):
+    def get_section_url(self, section):
+        return section.a.get("href")
+
+    def parse_single_section(self, section, section_url):
         try:
             figure_url = section.img.get("srcset").split()[-2]
             image = self.get_url_content(figure_url)
         except Exception:
             image = None
         title = section.h2.text.strip()
-        content = section.div.text.strip()
+        content = section.select("div")[-1].text.strip()
         tag = section.ul.select("li")[-1].text.strip()
-        section_url = section.a.get("href")
         data = {
             DBCOLUMNS.image: image,
             DBCOLUMNS.title: title,
             DBCOLUMNS.content: content,
             DBCOLUMNS.tag: tag,
-            DBCOLUMNS.link: section_url,
             DBCOLUMNS.archive: self.archive,
         }
         return data
@@ -86,11 +90,15 @@ class LesEchos(DataCollector):
         self.page_url_suffix = "?page={}"
         self.min_date = datetime.strptime("01-01-1991", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y/MM")
-
-        self.has_multiple_pages = True
+        self.is_dynamic = {"page": False, "section": False}
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
-    def parse_single_section(self, section):
+    def get_section_url(self, section):
+        section_url = section.a.get("href").strip()
+        section_url = section_url[1:] if section_url[0] == "/" else section_url
+        return self.url_format.format(section_url)
+
+    def parse_single_section(self, section, section_url):
         try:
             figure_url = section.a.picture.select("source")[-1].get("srcset")
             image = self.get_url_content(figure_url)
@@ -99,14 +107,11 @@ class LesEchos(DataCollector):
         title = section.h3.text.strip()
         content = section.select("a")[1].select("div")[-1].text.strip()
         tag = None
-        section_url = section.a.get("href").strip()
-        section_url = section_url[1:] if section_url[0] == "/" else section_url
         data = {
             DBCOLUMNS.image: image,
             DBCOLUMNS.title: title,
             DBCOLUMNS.content: content,
             DBCOLUMNS.tag: tag,
-            DBCOLUMNS.link: self.url_format.format(section_url),
             DBCOLUMNS.archive: self.archive,
         }
         return data
@@ -118,14 +123,19 @@ class VingthMinutes(DataCollector):
         self._base_url = "https://www.20minutes.fr"
 
         self.archive = Archives.vinghtminutes
-        self.content_selector = "section > div > ul > li"
+        self.content_selector = (
+            "article > div > div > div > div.grid > div.c-bulleted-list__item"
+        )
         self.min_date = datetime.strptime("01-01-2006", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y/MM-dd")
-        self.has_multiple_pages = False
+        self.is_dynamic = {"page": False, "section": False}
+
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
-    def parse_single_section(self, section):
-        section_url = self._base_url + section.a.get("href")
+    def get_section_url(self, section):
+        return section.a.get("href")
+
+    def parse_single_section(self, section, section_url):
         url_content = self.get_url_content(section_url)
         section_content = BeautifulSoup(url_content, "html.parser")
 
@@ -144,27 +154,27 @@ class VingthMinutes(DataCollector):
             DBCOLUMNS.title: title,
             DBCOLUMNS.content: content,
             DBCOLUMNS.tag: tag,
-            DBCOLUMNS.link: section_url,
             DBCOLUMNS.archive: self.archive,
         }
         return data
 
 
 class OuestFrance(DataCollector):
-    # note: we didn't collect data from this site yet.
     def __init__(self, begin_date, end_date, timeout):
-        url_format = "https://www.ouest-france.fr/archives/{}"
+        url_format = "https://www.ouest-france.fr/archives/{}/"
         self.archive = Archives.ouestfrance
         self.content_selector = "article > div"
         self.page_selector = "nav > ul > li"
         self.page_url_suffix = "?page={}"
-        self.min_date = datetime.strptime("01-01-2006", "%d-%m-%Y").date()
+        self.min_date = datetime.strptime("01-01-2012", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y/dd-MMMM-Y", locale="fr")
-        self.has_multiple_pages = True
+        self.is_dynamic = {"page": False, "section": False}
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
-    def parse_single_section(self, section):
-        section_url = section.a.get("href")
+    def get_section_url(self, section):
+        return section.a.get("href")
+
+    def parse_single_section(self, section, section_url):
         url_content = self.get_url_content(section_url)
         section_content = BeautifulSoup(url_content, "html.parser")
 
@@ -185,14 +195,12 @@ class OuestFrance(DataCollector):
             DBCOLUMNS.title: title,
             DBCOLUMNS.content: content,
             DBCOLUMNS.tag: tag,
-            DBCOLUMNS.link: section_url,
             DBCOLUMNS.archive: self.archive,
         }
         return data
 
 
 class Liberation(DataCollector):
-    # note: this class doesn't retrieve successfully the images yet
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.liberation.fr/archives/{}"
         self._base_url = "https://www.liberation.fr"
@@ -200,16 +208,18 @@ class Liberation(DataCollector):
         self.content_selector = "main article"
         self.min_date = datetime.strptime("01-01-1998", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y/MM/dd")
-        self.has_multiple_pages = False
+        self.is_dynamic = {"page": False, "section": True}
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
-    def parse_single_section(self, section):
-        section_url = self._base_url + section.a.get("href")
+    def get_section_url(self, section):
+        return self._base_url + section.a.get("href")
+
+    def parse_single_section(self, section, section_url):
         url_content = self.get_url_content(section_url)
         section_content = BeautifulSoup(url_content, "html.parser")
 
         try:
-            figure_url = section_content.main.img.get("src")
+            figure_url = section_content.main.figure.img.get("src")
             image = self.get_url_content(figure_url)
         except Exception:
             image = None
@@ -232,40 +242,42 @@ class Liberation(DataCollector):
             DBCOLUMNS.title: title,
             DBCOLUMNS.content: content,
             DBCOLUMNS.tag: tag,
-            DBCOLUMNS.link: section_url,
             DBCOLUMNS.archive: self.archive,
         }
         return data
 
 
 class Mediapart(DataCollector):
-    # note: we don't have a correct structure for this site for retrieving
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.mediapart.fr/journal/une/{}"
         self._base_url = "https://www.mediapart.fr"
         self.archive = Archives.mediapart
-        self.content_selector = "section"
+        self.content_selector = "h3"
         self.min_date = datetime.strptime("01-01-2009", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="ddMMYY")
-        self.has_multiple_pages = False
+        self.is_dynamic = {"page": False, "section": False}
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
-    def parse_single_section(self, section):
+    def get_section_url(self, section):
+        return self._base_url + section.a.get("href")
+
+    def parse_single_section(self, section, section_url):
+        url_content = self.get_url_content(section_url)
+        section_content = BeautifulSoup(url_content, "html.parser")
+
         try:
             figure_url = section.img.get("src")
             image = self.get_url_content(figure_url)
         except Exception:
             image = None
-        title = section.h2.text.strip()
-        content = section.select("p")[-2].text.strip()
-        tag = section.select("p")[0].text.strip()
-        section_url = self._base_url + section.a.get("href")
+        title = section_content.h1.text.strip()
+        content = section_content.main.select("p")[1].text.strip()
+        tag = section_content.main.select("p")[0].text.strip()
         data = {
             DBCOLUMNS.image: image,
             DBCOLUMNS.title: title,
             DBCOLUMNS.content: content,
             DBCOLUMNS.tag: tag,
-            DBCOLUMNS.link: section_url,
             DBCOLUMNS.archive: self.archive,
         }
         return data
@@ -279,12 +291,13 @@ class LeParisien(DataCollector):
         self.content_selector = "#top div > div > a"
         self.min_date = datetime.strptime("01-04-2009", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y/dd-MM-Y")
-        self.has_multiple_pages = False
+        self.is_dynamic = {"page": False, "section": False}
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
-    def parse_single_section(self, section):
-        section_url = "https:" + section.get("href")
-        logger.debug(f"getting data for section from {section_url}")
+    def get_section_url(self, section):
+        return "https:" + section.get("href")
+
+    def parse_single_section(self, section, section_url):
         url_content = self.get_url_content(section_url)
         section_content = BeautifulSoup(url_content, "html.parser")
 
@@ -304,7 +317,6 @@ class LeParisien(DataCollector):
             DBCOLUMNS.title: title,
             DBCOLUMNS.content: content,
             DBCOLUMNS.tag: tag,
-            DBCOLUMNS.link: section_url,
             DBCOLUMNS.archive: self.archive,
         }
         return data
@@ -315,15 +327,17 @@ class LHumanite(DataCollector):
         url_format = "https://www.humanite.fr/?s=&start_date={0}&end_date={0}"
         self.archive = Archives.lhumanite
         self.content_selector = "article a"
-        self.page_selector = "nav > div > div"
+        self.page_selector = "nav > div > div a"
         self.page_url_suffix = "&page={}"
         self.min_date = datetime.strptime("01-01-1998", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y-MM-dd")
-        self.has_multiple_pages = True
+        self.is_dynamic = {"page": False, "section": False}
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
-    def parse_single_section(self, section):
-        section_url = section.get("href")
+    def get_section_url(self, section):
+        return section.get("href")
+
+    def parse_single_section(self, section, section_url):
         logger.debug(f"getting data for section from {section_url}")
         url_content = self.get_url_content(section_url)
         section_content = BeautifulSoup(url_content, "html.parser")
@@ -335,15 +349,16 @@ class LHumanite(DataCollector):
             image = None
         title = section_content.h1.text.strip()
 
-        content = section_content.article.p.text.strip()
-        tag = section_content.article.a.text.strip()
+        content = "\n".join(
+            [p.text.strip() for p in section_content.article.div.select("p")]
+        )
+        tag = section_content.article.select("a.rubric")[0].text.strip()
 
         data = {
             DBCOLUMNS.image: image,
             DBCOLUMNS.title: title,
             DBCOLUMNS.content: content,
             DBCOLUMNS.tag: tag,
-            DBCOLUMNS.link: section_url,
             DBCOLUMNS.archive: self.archive,
         }
         return data
@@ -358,11 +373,13 @@ class LePoint(DataCollector):
         self.content_selector = "main > article"
         self.min_date = datetime.strptime("01-05-2010", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="MM-Y/dd")
-        self.has_multiple_pages = False
+        self.is_dynamic = {"page": False, "section": False}
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
-    def parse_single_section(self, section):
-        section_url = self._base_url + section.a.get("href")
+    def get_section_url(self, section):
+        return self._base_url + section.a.get("href")
+
+    def parse_single_section(self, section, section_url):
         url_content = self.get_url_content(section_url)
         section_content = BeautifulSoup(url_content, "html.parser")
 
@@ -381,45 +398,50 @@ class LePoint(DataCollector):
             DBCOLUMNS.title: title,
             DBCOLUMNS.content: content,
             DBCOLUMNS.tag: tag,
-            DBCOLUMNS.link: section_url,
             DBCOLUMNS.archive: self.archive,
         }
         return data
-    
+
 
 class LOrient(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.lorientlejour.com/seo.php?date={}"
-        self._base_url = "https://www.lorientlejour.com/"
+        self._base_url = "https://www.lorientlejour.com"
 
         self.archive = Archives.lorient
-        self.content_selector = "ul > li"
+        self.content_selector = "div.articles > ul > li"
         self.min_date = datetime.strptime("01-01-1997", "%d-%m-%Y").date()
         date2str = partial(format_datetime, format="Y-MM-dd")
-        self.has_multiple_pages = False
+        self.is_dynamic = {"page": False, "section": False}
         super().__init__(url_format, date2str, begin_date, end_date, timeout)
 
-    def parse_single_section(self, section):
-        section_url = self._base_url + section.a.get("href")
+    def get_section_url(self, section):
+        return self._base_url + section.a.get("href")
+
+    def parse_single_section(self, section, section_url):
         url_content = self.get_url_content(section_url)
         section_content = BeautifulSoup(url_content, "html.parser")
 
         try:
-            figure_url = section_content.figure.img.get("src")
+            figure_url = section_content.select("div.image-container img")[0].get("src")
             image = self.get_url_content(figure_url)
         except Exception:
             image = None
         title = section_content.h1.text.strip()
 
-        content = section_content.select("div#contenu")[0].text.strip()
-        tag = section_content.h3.text.strip()
+        content = section_content.select("div.article_full_text")
+        content = "\n".join(p.text.strip() for p in content)
+        if content == "":
+            content = section_content.select("div.article_truncated_text")[
+                0
+            ].text.strip()
+        tag = section_content.h3.select("a")[-1].text.strip()
 
         data = {
             DBCOLUMNS.image: image,
             DBCOLUMNS.title: title,
             DBCOLUMNS.content: content,
             DBCOLUMNS.tag: tag,
-            DBCOLUMNS.link: section_url,
             DBCOLUMNS.archive: self.archive,
         }
         return data

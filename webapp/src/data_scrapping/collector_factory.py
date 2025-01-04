@@ -1,15 +1,16 @@
-import re
 import time
 import logging
 import numpy as np
 from tqdm import tqdm
 from multiprocessing import Pool
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from src.helpers.enum import Archives
 from src.helpers.db_connector import DBConnector
 
 from src.utils.utils import alternate_elements
-from src.data_scrapping.decorators import AddPages
+
+from src.data_scrapping.decorators import AddPages, EliminateRedundancy
 from src.data_scrapping.collectors import (
     LeMonde,
     LeFigaro,
@@ -20,10 +21,13 @@ from src.data_scrapping.collectors import (
     Mediapart,
     LeParisien,
     LHumanite,
+    LePoint,
+    LOrient,
 )
 
 
 logger = logging.getLogger(__name__)
+engine = DBConnector.get_engine()
 
 
 class CollectorFactory:
@@ -37,6 +41,8 @@ class CollectorFactory:
         Archives.mediapart: Mediapart,
         Archives.leparisien: LeParisien,
         Archives.lhumanite: LHumanite,
+        Archives.lepoint: LePoint,
+        Archives.lorient: LOrient,
     }
 
     def __init__(self, collectors_names, workers, **kwargs) -> None:
@@ -48,8 +54,8 @@ class CollectorFactory:
                 name in CollectorFactory.MAPPING
             ), f"Unknown collector {name}. Should be one of {Archives}"
             collector = CollectorFactory.MAPPING[name](**kwargs)
-            # if collector.has_multiple_pages:
-            #     collector = AddPages(collector)
+            collector = AddPages(collector)
+            collector = EliminateRedundancy(collector)
             self.collectors.append(collector)
 
         assert (
@@ -60,7 +66,7 @@ class CollectorFactory:
         all_urls = []
 
         for collector in self.collectors:
-            all_urls.append(collector.get_all_url(collector.archive))
+            all_urls.append(collector.get_all_url())
 
         all_urls = alternate_elements(all_urls)
         assert len(all_urls) > 0, "No pages to collect"
@@ -69,36 +75,42 @@ class CollectorFactory:
     def parse_single_page(self, args):
         date, url = args
         for collector in self.collectors:
-            if re.match(collector.url_format.replace("?", "\?").format(".*"), url):
+            if collector.match_format(url):
                 collector.parse_single_page(date, url)
                 break
 
     def run(self):
-        DBConnector.create_table(DBConnector.get_engine(), DBConnector.TABLE)
+        DBConnector.create_table(engine, DBConnector.TABLE)
         urls = self.get_all_url()
 
         count_before = {}
         for name in self.collectors_names:
             count_before[name] = DBConnector.get_archive_count(
-                DBConnector.get_engine(), DBConnector.TABLE, name
+                engine, DBConnector.TABLE, name
+            )
+            logger.info(
+                f"We already collected {count_before[name]} articles for {name} archive."
             )
 
         logger.info(f"Getting the data for {len(urls)} dates")
         start = time.time()
 
-        with Pool(self.workers) as pool:
-            for _ in tqdm(
-                pool.imap_unordered(self.parse_single_page, urls),
-                total=len(urls),
-            ):
+        # with Pool(self.workers) as pool:
+        #     for _ in tqdm(
+        #         pool.imap_unordered(self.parse_single_page, urls, chunksize=10),
+        #         total=len(urls),
+        #     ):
+        #         pass
+
+        with ThreadPoolExecutor(max_workers=self.workers) as executor:
+            futures = [executor.submit(self.parse_single_page, url) for url in urls]
+            for _ in tqdm(as_completed(futures), total=len(futures), desc="Scraping"):
                 pass
 
         end = np.round((time.time() - start) / 60, 2)
 
         for name in self.collectors_names:
-            rows_nb = DBConnector.get_archive_count(
-                DBConnector.get_engine(), DBConnector.TABLE, name
-            )
+            rows_nb = DBConnector.get_archive_count(engine, DBConnector.TABLE, name)
             diff = rows_nb - count_before[name]
             logger.info(
                 f"\nFor {name}:\n"
