@@ -1,14 +1,13 @@
 import re
 import logging
 import dateparser
-import numpy as np
-import cloudscraper
+import pandas as pd
 from bs4 import BeautifulSoup
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, date
 
 from src.utils.utils import hash_url
-from src.helpers.enum import DBCOLUMNS, headers
+from src.helpers.enum import DBCOLUMNS
 from src.helpers.db_connector import DBConnector
 from src.data_scrapping.strategy import StrategyFactory
 
@@ -33,7 +32,7 @@ class DataCollector(ABC):
             self.engine = DBConnector.get_engine()
 
     def match_format(self, url):
-        return bool(re.match(self.url_format.replace("?", "\?").format(".*"), url))
+        return bool(re.match(self.url_format.replace("?", "\?").format(date=".*", page=""), url))
 
     def _convert_to_date(self, str_date):
         if str_date is not None:
@@ -48,23 +47,24 @@ class DataCollector(ABC):
             date = self.begin_date + timedelta(days=day)
             all_dates.append(date)
 
-        np.random.shuffle(all_dates)
         all_urls = [
             (
                 date,
                 self.url_format.format(
-                    self.date2str(date).translate(self._translation_table)
-                ),
+                    date=self.date2str(date).translate(self._translation_table),
+                    page="{page}"
+                )
             )
             for date in all_dates
         ]
-        return all_urls
+        df = pd.DataFrame(all_urls, columns=["date", "str_format"])
+        return df.drop_duplicates("str_format").sample(frac=1).values
 
     def get_url_content(self, url):
         return self._fetch_strategy.get_url_content(url)
 
     def get_sections(self, url):
-        content = self.get_url_content(url)
+        content = self.get_url_content(url.format(page=""))
         parsed_content = BeautifulSoup(content, "html.parser")
         sections = parsed_content.select(self.content_selector)
         return sections, parsed_content
@@ -78,7 +78,7 @@ class DataCollector(ABC):
             for section in sections:
                 try:
                     section_url = self.get_section_url(section)
-                    if section_url is not None and not self.match_format(section_url):
+                    if section_url is not None:
                         data = self.parse_single_section(section, section_url)
 
                         data[DBCOLUMNS.date] = date

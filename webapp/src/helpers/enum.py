@@ -13,6 +13,11 @@ class Archives(str, Enum):
     lhumanite = "lhumanite"
     lepoint = "lepoint"
     lorient = "lorient"
+    rfi = "rfi"
+    franceinfo = "franceinfo"
+    lalsace = "lalsace"
+    france24 = "france24"
+    mondediplomatique = "mondediplomatique"
 
 
 class DBCOLUMNS(str, Enum):

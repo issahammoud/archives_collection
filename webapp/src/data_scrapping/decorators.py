@@ -60,17 +60,16 @@ class AddPages(Decorator):
             return 0
 
     def get_sections(self, url):
-        sections, parsed_content = self._collector.get_sections(url)
         if not hasattr(self._collector, "page_selector"):
+            sections, parsed_content = self._collector.get_sections(url.format(page=""))
             return sections, None
 
+        sections, parsed_content = self._collector.get_sections(url.format(page=""))
         max_page = self._get_max_page(parsed_content)
         logger.debug(f"There are {max_page} pages to add")
         for page in range(2, max_page + 1):
             try:
-                new_url = os.path.join(
-                    url, self._collector.page_url_suffix.format(page)
-                )
+                new_url = url.format(page=self._collector.page_url_suffix.format(page))
                 new_sections, _ = self._collector.get_sections(new_url)
                 sections += new_sections
             except:

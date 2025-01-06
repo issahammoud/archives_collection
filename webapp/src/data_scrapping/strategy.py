@@ -10,9 +10,6 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support import expected_conditions as EC
 
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
-
 from src.helpers.enum import headers
 from src.utils.logging import logging
 from src.helpers.enum import Archives
@@ -29,8 +26,7 @@ class ContentFetchStrategy(ABC):
 
 
 class RequestsFetchStrategy(ContentFetchStrategy):
-    def __init__(self, maxsize):
-        self._maxsize = maxsize
+    def __init__(self):
         self._start_time = time.time()
         self._init_scraper()
 
@@ -143,7 +139,7 @@ class BrowserFetchStrategy(ContentFetchStrategy):
 class StrategyFactory:
     def __init__(self, collector):
         self._collector = collector
-        self._request_strategy = RequestsFetchStrategy(maxsize=100)
+        self._request_strategy = RequestsFetchStrategy()
         self._browser_strategy = BrowserFetchStrategy(collector.archive == Archives.lefigaro)
 
     def get_url_content(self, url):

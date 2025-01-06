@@ -23,6 +23,11 @@ from src.data_scrapping.collectors import (
     LHumanite,
     LePoint,
     LOrient,
+    RFI,
+    FranceInfo,
+    LAlsace,
+    France24,
+    MondeDiplomatique
 )
 
 
@@ -43,6 +48,11 @@ class CollectorFactory:
         Archives.lhumanite: LHumanite,
         Archives.lepoint: LePoint,
         Archives.lorient: LOrient,
+        Archives.rfi: RFI,
+        Archives.franceinfo: FranceInfo,
+        Archives.lalsace: LAlsace,
+        Archives.france24: France24,
+        Archives.mondediplomatique: MondeDiplomatique
     }
 
     def __init__(self, collectors_names, workers, **kwargs) -> None:
@@ -94,13 +104,6 @@ class CollectorFactory:
 
         logger.info(f"Getting the data for {len(urls)} dates")
         start = time.time()
-
-        # with Pool(self.workers) as pool:
-        #     for _ in tqdm(
-        #         pool.imap_unordered(self.parse_single_page, urls, chunksize=10),
-        #         total=len(urls),
-        #     ):
-        #         pass
 
         with ThreadPoolExecutor(max_workers=self.workers) as executor:
             futures = [executor.submit(self.parse_single_page, url) for url in urls]

@@ -12,7 +12,7 @@ if __name__ == "__main__":
 
     collector = CollectorFactory(
         config.archives,
-        config.workers,
+        2 * len(config.archives),
         begin_date=config.begin_date,
         end_date=config.end_date,
         timeout=config.timeout,
