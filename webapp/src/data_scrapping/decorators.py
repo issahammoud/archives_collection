@@ -1,4 +1,3 @@
-import os
 import logging
 
 from src.utils.utils import hash_url
@@ -25,8 +24,8 @@ class Decorator(DataCollector):
     def match_format(self, url):
         return self._collector.match_format(url)
 
-    def get_all_url(self):
-        return self._collector.get_all_url()
+    def get_all_urls(self):
+        return self._collector.get_all_urls()
 
     def get_url_content(self, url):
         return self._collector.get_url_content(url)

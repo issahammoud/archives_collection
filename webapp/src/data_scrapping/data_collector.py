@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class DataCollector(ABC):
+
     def __init__(self, url_format, date2str, begin_date, end_date, timeout):
         super().__init__()
         self.url_format = url_format
@@ -32,7 +33,9 @@ class DataCollector(ABC):
             self.engine = DBConnector.get_engine()
 
     def match_format(self, url):
-        return bool(re.match(self.url_format.replace("?", "\?").format(date=".*", page=""), url))
+        return bool(
+            re.match(self.url_format.replace("?", "\?").format(date=".*", page=""), url)
+        )
 
     def _convert_to_date(self, str_date):
         if str_date is not None:
@@ -41,7 +44,7 @@ class DataCollector(ABC):
             return dateparser.parse(str_date, ["%d-%m-%Y"]).date()
         return datetime.now().date()
 
-    def get_all_url(self):
+    def get_all_urls(self):
         all_dates = []
         for day in range((self.end_date - self.begin_date + timedelta(days=1)).days):
             date = self.begin_date + timedelta(days=day)
@@ -52,8 +55,8 @@ class DataCollector(ABC):
                 date,
                 self.url_format.format(
                     date=self.date2str(date).translate(self._translation_table),
-                    page="{page}"
-                )
+                    page="{page}",
+                ),
             )
             for date in all_dates
         ]

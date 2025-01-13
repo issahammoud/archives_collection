@@ -57,3 +57,5 @@ onnx/
 !logo.png
 *env/
 .env
+
+*csv

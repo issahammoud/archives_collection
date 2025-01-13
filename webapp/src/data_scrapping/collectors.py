@@ -6,11 +6,12 @@ from datetime import datetime
 from babel.dates import format_datetime
 from src.helpers.enum import Archives, DBCOLUMNS
 from src.data_scrapping.data_collector import DataCollector
+from src.data_scrapping.collectors_registry import Registry
 
 
 logger = logging.getLogger(__name__)
 
-
+@Registry.register()
 class LeMonde(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.lemonde.fr/archives-du-monde/{date}/{page}"
@@ -85,6 +86,7 @@ class LeFigaro(DataCollector):
         return data
 
 
+@Registry.register()
 class LesEchos(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.lesechos.fr/{date}{page}"
@@ -121,6 +123,7 @@ class LesEchos(DataCollector):
         return data
 
 
+@Registry.register()
 class VingthMinutes(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.20minutes.fr/archives/{date}"
@@ -165,6 +168,7 @@ class VingthMinutes(DataCollector):
         return data
 
 
+@Registry.register()
 class OuestFrance(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.ouest-france.fr/archives/{date}/{page}"
@@ -257,6 +261,7 @@ class Liberation(DataCollector):
         return data
 
 
+@Registry.register()
 class Mediapart(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.mediapart.fr/journal/une/{date}"
@@ -296,6 +301,7 @@ class Mediapart(DataCollector):
         return data
 
 
+@Registry.register()
 class LeParisien(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.leparisien.fr/archives/{date}"
@@ -337,6 +343,7 @@ class LeParisien(DataCollector):
         return data
 
 
+@Registry.register()
 class LHumanite(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.humanite.fr/toutes-les-archives{page}?{date}"
@@ -382,6 +389,7 @@ class LHumanite(DataCollector):
         return data
 
 
+@Registry.register()
 class LePoint(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.lepoint.fr/archives/{date}.php"
@@ -424,6 +432,7 @@ class LePoint(DataCollector):
         return data
 
 
+@Registry.register()
 class LOrient(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.lorientlejour.com/seo.php?date={date}"
@@ -456,7 +465,7 @@ class LOrient(DataCollector):
             content = section_content.select("div.article_truncated_text")[
                 0
             ].text.strip()
-        
+
         try:
             tag = section_content.h3.select("a")[-1].text.strip()
         except:
@@ -471,6 +480,7 @@ class LOrient(DataCollector):
         return data
 
 
+@Registry.register()
 class RFI(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.rfi.fr/fr/archives/{date}"
@@ -510,8 +520,9 @@ class RFI(DataCollector):
             DBCOLUMNS.archive: self.archive,
         }
         return data
-    
 
+
+@Registry.register()
 class FranceInfo(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.francetvinfo.fr/archives/{date}.html"
@@ -539,7 +550,7 @@ class FranceInfo(DataCollector):
         title = section_content.h1.text.strip()
 
         content = section_content.select("article div.c-chapo")[0].text.strip()
-        
+
         tag = None
         data = {
             DBCOLUMNS.image: image,
@@ -551,6 +562,7 @@ class FranceInfo(DataCollector):
         return data
 
 
+@Registry.register()
 class LAlsace(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.lalsace.fr/archives/{date}"
@@ -579,7 +591,7 @@ class LAlsace(DataCollector):
         title = section_content.h1.text.strip().split("\n")[-1].strip()
 
         content = section_content.select("div.chapo")[0].text.strip()
-        
+
         tag = section_content.h1.span.text.strip()
         data = {
             DBCOLUMNS.image: image,
@@ -589,8 +601,9 @@ class LAlsace(DataCollector):
             DBCOLUMNS.archive: self.archive,
         }
         return data
-    
 
+
+@Registry.register()
 class France24(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.france24.com/fr/archives/{date}"
@@ -634,6 +647,7 @@ class France24(DataCollector):
         return data
 
 
+@Registry.register()
 class MondeDiplomatique(DataCollector):
     def __init__(self, begin_date, end_date, timeout):
         url_format = "https://www.monde-diplomatique.fr/{date}"

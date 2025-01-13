@@ -1,16 +1,9 @@
 import json
 import argparse
-from src.helpers.enum import Archives
 
 
 def get_config():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--archives",
-        type=str,
-        nargs="+",
-        help=f"The archives names to collect from. One of {Archives}",
-    )
     parser.add_argument(
         "--begin_date",
         type=str,
@@ -18,9 +11,6 @@ def get_config():
     )
     parser.add_argument(
         "--end_date", type=str, help="The end date for collection in format dd-mm-yyyy"
-    )
-    parser.add_argument(
-        "--workers", type=int, default=16, help="How many workers to use"
     )
     parser.add_argument(
         "--timeout",
@@ -36,8 +26,5 @@ def get_config():
         parser.set_defaults(**config)
         args = parser.parse_args()
 
-    assert all(
-        [archive in list(Archives) for archive in args.archives]
-    ), "some archive name is not in the list"
 
     return args

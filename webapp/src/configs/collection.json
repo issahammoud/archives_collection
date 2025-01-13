@@ -1,7 +1,4 @@
 {
-"archives": ["lhumanite", "lesechos", "franceinfo", "mondediplomatique",
-            "rfi", "lalsace", "france24"],
-"begin_date": "01-01-1950",
+"begin_date": "05-01-2025",
 "end_date": null,
-"workers": 9,
 "timeout": 5}

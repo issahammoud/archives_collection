@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 from sqlalchemy import (
     create_engine,
     MetaData,
@@ -409,3 +410,36 @@ class DBConnector:
         table_ref = Table(table, metadata, autoload_with=engine)
 
         table_ref.drop(engine)
+
+    @has_table_decorator
+    @staticmethod
+    def export_text_to_csv(engine, table, output_csv, columns):
+        metadata = MetaData()
+        table_ref = Table(table, metadata, autoload_with=engine)
+        title_min_words = 5
+        content_min_words = 10
+        chunksize = 100000
+
+        selected_cols = [table_ref.c[col] for col in columns]
+        query = (
+            table_ref.select()
+            .with_only_columns(*selected_cols)
+            .where(
+                func.array_length(
+                    func.string_to_array(table_ref.c[DBCOLUMNS.title], " "), 1
+                )
+                >= title_min_words
+            )
+            .where(
+                func.array_length(
+                    func.string_to_array(table_ref.c[DBCOLUMNS.content], " "), 1
+                )
+                >= content_min_words
+            )
+        )
+        with engine.connect() as connection:
+            with open(output_csv, "w", encoding="utf-8", newline="") as file:
+                first_chunk = True
+                for chunk in pd.read_sql(query, connection, chunksize=chunksize):
+                    chunk.to_csv(file, index=False, header=first_chunk)
+                    first_chunk = False
