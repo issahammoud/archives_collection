@@ -188,7 +188,6 @@ class Navbar:
 
     @staticmethod
     def get_switches(total_count):
-
         sorting = dmc.ActionIcon(
             DashIconify(icon="ic:outline-swap-vert", width=20),
             id="asc_desc",
@@ -218,20 +217,61 @@ class Navbar:
             position="top",
         )
 
-        badge = Navbar.get_badge(total_count)
-
-        group_by = Navbar.group_by_btn()
+        group_by = Navbar.group_by_btn(total_count)
         return dmc.Grid(
             [
-                dmc.GridCol(badge, span=3),
-                dmc.GridCol(sorting, span=3),
-                dmc.GridCol(null_img, span=3),
-                dmc.GridCol(group_by, span=3),
+                dmc.GridCol(sorting, span=4),
+                dmc.GridCol(null_img, span=4),
+                dmc.GridCol(group_by, span=4),
             ]
         )
 
     @staticmethod
-    def group_by_btn():
+    def get_control_btns(total_count):
+        start_collection = dmc.ActionIcon(
+            DashIconify(icon="uis:process", width=20),
+            id="start_collect",
+            color="#ff5757",
+            variant="subtle",
+        )
+        start_collection = dmc.Tooltip(
+            start_collection,
+            label="Start Collection",
+            multiline=True,
+            withArrow=True,
+            openDelay=3,
+            position="top",
+        )
+        stop_collection = dmc.ActionIcon(
+            DashIconify(icon="ic:round-stop", width=20),
+            id="stop_collect",
+            color="#ff5757",
+            variant="subtle",
+            disabled=True,
+        )
+        stop_collection = dmc.Tooltip(
+            stop_collection,
+            label="Stop Collection",
+            multiline=True,
+            withArrow=True,
+            openDelay=3,
+            position="top",
+        )
+
+        badge = Navbar.get_badge(total_count)
+        return dmc.Grid(
+            [
+                dmc.GridCol(badge, span=4),
+                dmc.GridCol(start_collection, span=4),
+                dmc.GridCol(stop_collection, span=4),
+            ],
+            justify="center",
+        )
+
+    @staticmethod
+    def group_by_btn(total_count):
+        value = "day" if total_count < 1e4 else "month"
+        value = value if total_count < 1e6 else "year"
         target = dmc.Tooltip(
             dmc.ActionIcon(
                 DashIconify(icon="ri:bar-chart-grouped-line", width=20),
@@ -249,7 +289,7 @@ class Navbar:
                     [dmc.Radio(v, value=v) for v in ["day", "month", "year"]]
                 ),
                 id="groupby",
-                value="month",
+                value=value,
                 size="xs",
             ),
         )
@@ -272,12 +312,13 @@ class Navbar:
             if total_count
             else DBConnector.get_total_count(engine, DBConnector.TABLE) or 0
         )
-
         date = Navbar.filter_by_date()
         tag = Navbar.filter_by_tag()
         text = Navbar.filter_by_text()
         archives = Navbar.filter_by_archive()
         switches = Navbar.get_switches(total_count)
+        control_btns = Navbar.get_control_btns(total_count)
+
         drawer_control = dmc.ActionIcon(
             DashIconify(
                 icon="ic:round-navigate-next",
@@ -305,10 +346,10 @@ class Navbar:
                 drawer_control,
                 dmc.Drawer(
                     dmc.Stack(
-                        [switches, date, tag, text, archives],
+                        [control_btns, switches, date, tag, text, archives],
                         align="stretch",
                         justify="space-between",
-                        gap="xl",
+                        gap="sm",
                     ),
                     id="drawer",
                     closeOnClickOutside=False,
@@ -329,11 +370,11 @@ class Navbar:
 
 class Main:
     @staticmethod
-    def get_alert():
+    def get_alert(text="We didn't find any data with your current filters."):
         return dmc.Container(
             dmc.Alert(
                 dmc.Text(
-                    "We didn't find any data with your current filters.",
+                    text,
                     c="dimmed",
                     fw=300,
                 ),
@@ -353,13 +394,13 @@ class Main:
         return dmc.Box(stats_bar, id="stats_bar")
 
     @staticmethod
-    def get_card(rowid, byte_img, title, content, tag, archive, date, link):
+    def get_card(rowid, img_path, title, content, tag, archive, date, link):
         img_height = 200
-        src = (
-            resize_image_for_html(byte_img, target_height=img_height)
-            if byte_img
-            else "https://placehold.co/600x400?text=Placeholder"
-        )
+        if img_path:
+            src = resize_image_for_html(img_path, target_height=img_height)
+        if img_path is None or src is None:
+            src = "https://placehold.co/600x400?text=Placeholder"
+
         date = datetime.strftime(date, "%B, %d %Y")
         archive = archive.strip().title() if archive else archive
         tag = tag.strip().title() if tag else "None"
@@ -393,7 +434,7 @@ class Main:
                                         title,
                                         fw=500,
                                         size="md",
-                                        truncate=True,
+                                        truncate="end",
                                         lineClamp=1,
                                         ta="left",
                                     ),
@@ -438,6 +479,7 @@ class Main:
                                         c="dimmed",
                                         fs="italic",
                                         ta="left",
+                                        truncate="end",
                                     ),
                                     pb=15,
                                 ),
@@ -493,10 +535,32 @@ class Main:
         return carousel
 
     @staticmethod
+    def get_download_btn():
+        download = dmc.ActionIcon(
+            DashIconify(icon="icons8:download-2", width=20),
+            id="download",
+            color="#ff5757",
+            variant="subtle",
+            style={
+                "position": "absolute",
+                "top": -20,
+                "right": -20,
+                "zIndex": 1,
+            },
+        )
+        return download
+
+    @staticmethod
     def get_main(df, args, order):
+        download_btn = Main.get_download_btn()
         stats = Main.get_stats(df, order)
         carousel = Main.get_carousel(args)
-        main = dmc.Stack([stats, carousel], gap="xl", align="stretch")
+        main = dmc.Stack(
+            [download_btn, stats, carousel],
+            gap="xl",
+            align="stretch",
+            style={"position": "relative"},
+        )
         return main
 
 
@@ -508,7 +572,7 @@ class Layout:
     def get_footer():
         return dmc.Box(
             dmc.Text(
-                "© Copyright Intuitive Deep Learning 2024.",
+                "© Copyright Intuitive Deep Learning 2025.",
                 size="sm",
             ),
             mt=8,
@@ -528,6 +592,11 @@ class Layout:
                     data={DBCOLUMNS.rowid: "", DBCOLUMNS.date: None, "direction": None},
                 ),
                 dcc.Store(id="states", data={}),
+                dcc.Store(id="job_status", data={}),
+                dcc.Download(id="download_csv"),
+                dcc.Interval(
+                    id="interval", interval=5000, n_intervals=0, disabled=True
+                ),
                 dmc.AppShellHeader(
                     dmc.Container(
                         header,

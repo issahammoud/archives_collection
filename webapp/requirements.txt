@@ -7,7 +7,9 @@ seaborn==0.12
 jupyter==1.0
 tqdm==4.66
 gunicorn==21.2
-dash==2.15
+dash[celery]==2.18.2
+dash-extensions==1.0.20
+celery[redis]==5.4.0
 dash-mantine-components==0.15
 dash-iconify==0.1.2
 SQLAlchemy==2.0.29

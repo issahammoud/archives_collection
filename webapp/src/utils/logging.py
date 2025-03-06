@@ -19,7 +19,7 @@ LOGGING_CONFIG = {
             "level": "DEBUG",
             "mode": "w",
             "formatter": "standard",
-            "filename": "logs.log",
+            "filename": "/tmp/logs.log",
             "class": "logging.handlers.RotatingFileHandler",
             "maxBytes": 1000000000,
             "backupCount": 20,

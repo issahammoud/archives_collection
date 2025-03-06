@@ -26,5 +26,4 @@ def get_config():
         parser.set_defaults(**config)
         args = parser.parse_args()
 
-
     return args

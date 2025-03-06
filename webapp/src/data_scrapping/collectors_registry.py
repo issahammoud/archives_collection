@@ -9,6 +9,7 @@ class Registry:
         def wrapper(subclass):
             cls._registry[subclass.__name__] = subclass
             return subclass
+
         return wrapper
 
     @classmethod
@@ -30,9 +31,7 @@ class Registry:
         for name in cls.list_registered():
             collectors.append(cls.create(name, *args, **kwargs))
         return collectors
-    
+
     @classmethod
     def list_registered(cls):
         return list(cls._registry.keys())
-    
-    

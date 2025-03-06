@@ -1,5 +1,6 @@
 FROM python:3.10-slim
 
+
 WORKDIR /webapp
 
 RUN apt-get update && \
@@ -21,4 +22,5 @@ ENV PYTHONPATH=/webapp
 
 EXPOSE 8050
 
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8050", "src.main.app:server"]
+CMD gunicorn -w 4 -b 0.0.0.0:8050 src.main.app:server
+# CMD ["python3", "src/main/app.py"] # replace the gunicorn cmd with this for testing

@@ -14,7 +14,7 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
 )
 from sqlalchemy.sql import and_
-from sqlalchemy.types import String, DateTime, LargeBinary
+from sqlalchemy.types import String, DateTime, LargeBinary, Text
 
 from src.utils.logging import logging
 from src.helpers.enum import DBCOLUMNS
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 class DBConnector:
 
-    TABLE = "sections"
+    TABLE = "test_table"
 
     operator_map = {
         "eq": lambda column, value: column == value,
@@ -64,16 +64,17 @@ class DBConnector:
 
     @staticmethod
     def create_table(engine, table):
-        if not DBConnector.has_table(engine, table):
-            metadata = MetaData()
+        metadata = MetaData()
 
+        if not DBConnector.has_table(engine, table):
+            print(f"creating table {table}")
             table_ref = Table(
                 table,
                 metadata,
                 Column(DBCOLUMNS.rowid.value, String, nullable=False),
                 Column(DBCOLUMNS.date.value, DateTime, nullable=False),
                 Column(DBCOLUMNS.archive.value, String, nullable=False),
-                Column(DBCOLUMNS.image.value, LargeBinary, nullable=True),
+                Column(DBCOLUMNS.image.value, Text, nullable=True),
                 Column(DBCOLUMNS.title.value, String, nullable=True),
                 Column(DBCOLUMNS.content.value, String, nullable=True),
                 Column(DBCOLUMNS.tag.value, String, nullable=True),
@@ -84,20 +85,23 @@ class DBConnector:
             metadata.create_all(engine)
 
             index_asc = Index(
-                "idx_rowid_date_asc",
+                "index_rowid_date_asc",
                 table_ref.c[DBCOLUMNS.rowid].asc(),
                 table_ref.c[DBCOLUMNS.date].asc(),
             )
             index_asc.create(bind=engine)
 
             index_desc = Index(
-                "idx_rowid_date_desc",
+                "index_rowid_date_desc",
                 table_ref.c[DBCOLUMNS.rowid].desc(),
                 table_ref.c[DBCOLUMNS.date].desc(),
             )
             index_desc.create(bind=engine)
 
             DBConnector.add_searchable_column(engine, table, DBCOLUMNS.text_searchable)
+            return table_ref
+
+        return Table(DBConnector.TABLE, metadata, autoload_with=engine)
 
     @staticmethod
     def has_table(engine, table):
@@ -156,6 +160,7 @@ class DBConnector:
             query = DBConnector.apply_filters(query, table_ref, filters)
 
             total_count = connection.execute(query).scalar()
+
         return total_count
 
     @has_table_decorator
@@ -190,6 +195,19 @@ class DBConnector:
 
     @has_table_decorator
     @staticmethod
+    def get_all_rows(engine, table, filters=None, columns=None):
+        metadata = MetaData()
+        table_ref = Table(table, metadata, autoload_with=engine)
+        columns = columns if columns else list(DBCOLUMNS)
+
+        with engine.connect() as connection:
+            query = select(*(table_ref.c[col] for col in columns))
+            query = DBConnector.apply_filters(query, table_ref, filters)
+            result = connection.execute(query)
+            return result.fetchall()
+
+    @has_table_decorator
+    @staticmethod
     def get_archive_rows(engine, table, archive, columns=None, filters=None):
         metadata = MetaData()
         table_ref = Table(table, metadata, autoload_with=engine)
@@ -213,7 +231,8 @@ class DBConnector:
             query = select(func.count()).where(table_ref.c.archive == archive)
             query = DBConnector.apply_filters(query, table_ref, filters)
             result = connection.execute(query)
-            return result.scalar()
+            count = result.scalar()
+            return count if count else 0
 
     @has_table_decorator
     @staticmethod

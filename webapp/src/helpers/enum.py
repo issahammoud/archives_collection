@@ -30,7 +30,6 @@ class DBCOLUMNS(str, Enum):
     tag = "tag"
     link = "link"
     text_searchable = "text_searchable"
-    embedding = "embedding"
 
 
 headers = {

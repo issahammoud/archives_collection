@@ -1,13 +1,16 @@
 import dash
+import logging
 import pandas as pd
 from dash.exceptions import PreventUpdate
-from dash import Input, State, Output, callback
-
+from dash_extensions.enrich import Input, State, Output, callback, dcc
 from src.helpers.enum import DBCOLUMNS
 from src.utils.utils import prepare_query
 from src.helpers.db_connector import DBConnector
 from src.helpers.layout import Layout, Navbar, Main
+from src.utils.celery_tasks import collection_task, revoke_task
 
+
+logger = logging.getLogger(__name__)
 engine = DBConnector.get_engine()
 
 
@@ -49,11 +52,12 @@ def get_filters_dict(archive, tag, date_range, submit, null_clicks, query):
     Input("query", "n_submit"),
     Input("asc_desc", "n_clicks"),
     Input("null_img", "n_clicks"),
+    Input("interval", "n_intervals"),
     State("query", "value"),
     State("groupby", "value"),
 )
 def create_content(
-    archive, tag, date_range, submit, sort_clicks, null_clicks, query, value
+    archive, tag, date_range, submit, sort_clicks, null_clicks, n, query, groupby
 ):
     filters = get_filters_dict(archive, tag, date_range, submit, null_clicks, query)
 
@@ -66,10 +70,9 @@ def create_content(
         "null_clicks": null_clicks,
         "order": order,
         "query": query,
-        "groupby": value,
+        "groupby": groupby,
     }
 
-    df = pd.DataFrame(DBConnector.group_by(engine, DBConnector.TABLE, value, filters))
     args = DBConnector.fetch_data_keyset(
         engine,
         DBConnector.TABLE,
@@ -87,9 +90,16 @@ def create_content(
         ],
         desc_order=order,
     )
+
+    args = args if args else []
     total_count = DBConnector.get_total_count(engine, DBConnector.TABLE, filters)
+    total_count = total_count if total_count else 0
+
     badge = Navbar.get_badge(total_count)
     if len(args) > Layout.SLIDES:
+        df = pd.DataFrame(
+            DBConnector.group_by(engine, DBConnector.TABLE, groupby, filters)
+        )
         last_seen = {
             "forward": {
                 DBCOLUMNS.date: args[-1 - Layout.SLIDES][-2],
@@ -215,4 +225,83 @@ def group_by(value, states):
             DBConnector.group_by(engine, DBConnector.TABLE, value, filters)
         )
         return Main.get_stats(df, not order), False
+    raise PreventUpdate
+
+
+@callback(
+    Output("download_csv", "data"),
+    Input("download", "n_clicks"),
+    State("states", "data"),
+    prevent_initial_call=True,
+)
+def download(n_clicks, states):
+    if n_clicks:
+        archive = states["archive"]
+        tag = states["tag"]
+        date_range = states["date_range"]
+        query = states["query"]
+        null_clicks = states["null_clicks"]
+
+        filters = get_filters_dict(archive, tag, date_range, True, null_clicks, query)
+        columns = [col for col in list(DBCOLUMNS) if "text_searchable" not in col]
+        data = DBConnector.get_all_rows(engine, DBConnector.TABLE, filters, columns)
+        df = pd.DataFrame(data, columns=columns)
+        return dcc.send_data_frame(df.to_csv, "data.csv")
+
+    raise PreventUpdate
+
+
+@callback(
+    Output("job_status", "data"),
+    Output("interval", "disabled"),
+    Input("start_collect", "n_clicks"),
+    State("states", "data"),
+    prevent_initial_call=True,
+)
+def start_collection(n_clicks, states):
+    if n_clicks:
+        date_range = states.get("date_range")
+        try:
+            task = collection_task.apply_async(args=(date_range[0], date_range[1]))
+            return {"task_id": task.id, "status": "start"}, False
+        except Exception as e:
+            print(f"Failed to start task: {str(e)}")
+            return dash.no_update, True
+    raise PreventUpdate
+
+
+@callback(
+    Output("job_status", "data", allow_duplicate=True),
+    Input("stop_collect", "n_clicks"),
+    State("job_status", "data"),
+    prevent_initial_call=True,
+)
+def stop_collection(n_clicks, job_status):
+    if n_clicks:
+        status = job_status.copy()
+        status["status"] = "stop"
+        return status
+    raise PreventUpdate
+
+
+@callback(
+    Output("interval", "disabled", allow_duplicate=True),
+    Output("start_collect", "disabled"),
+    Output("stop_collect", "disabled"),
+    Input("interval", "n_intervals"),
+    State("job_status", "data"),
+    prevent_initial_call=True,
+)
+def refresh(n, job_status):
+    if job_status and "task_id" in job_status:
+        task_id = job_status["task_id"]
+        status = job_status["status"]
+        task = collection_task.AsyncResult(task_id)
+
+        if status == "stop":
+            revoke_task(task_id)
+            return True, False, True
+        if task.state == "SUCCESS":
+            return True, False, True
+        return False, True, False
     raise PreventUpdate

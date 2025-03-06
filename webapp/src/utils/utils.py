@@ -1,4 +1,5 @@
 import re
+import os
 import base64
 import hashlib
 import itertools
@@ -25,24 +26,50 @@ def hash_url(url):
     return hashlib.sha256(url.encode("utf-8")).hexdigest()
 
 
-def resize_image_for_html(image_bytes, target_height=300):
+def resize_image_for_html(img_path, target_height=300):
     """
     We used this library instead of PIL or cv2 because many
     images were encoded in an unsupported format by those libraries.
     """
     try:
-        with WandImage(blob=image_bytes) as img:
+        with WandImage(filename=img_path) as img:  # .replace("./data/", "/images/")
             aspect_ratio = img.width / img.height
             new_width = int(target_height * aspect_ratio)
             img.resize(new_width, target_height)
-            resized_image_bytes = img.make_blob(format="png")
+            resized_image_bytes = img.make_blob(format="webp")
 
         encoded_image = base64.b64encode(resized_image_bytes).decode()
+        return f"data:image/webp;base64,{encoded_image}"
+
     except Exception as e:
         print(f"Error processing image: {e}")
-        encoded_image = base64.b64encode(image_bytes).decode("utf-8")
+        return None
 
-    return f"data:image/png;base64,{encoded_image}"
+
+def save_image(file_path, image_bytes, quality=80):
+    try:
+        with WandImage(blob=image_bytes) as img:
+            img.quality = quality
+            img.format = "webp"
+            img.save(filename=file_path)
+    except Exception:
+        with open(file_path, "wb") as file:
+            file.write(image_bytes)
+
+
+def get_image_path(data_dir, date, rowid):
+    try:
+        year = date.year
+        month = date.month
+    except Exception as e:
+        year = "unknown"
+        month = "unknown"
+
+    subdir = os.path.join(data_dir, str(year), str(month))
+    os.makedirs(subdir, exist_ok=True)
+    file_name = f"{rowid}.webp"
+    file_path = os.path.join(subdir, file_name)
+    return file_path
 
 
 def convert_count_to_str(count):

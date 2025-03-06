@@ -20,7 +20,7 @@ class CollectorsAggregator:
             len(self.collectors) > 0
         ), f"Found {len(self.collectors)} collectors. Should have at least 1."
 
-        self.workers = 2 * len(self.collectors)
+        self.workers = len(self.collectors)
 
     def get_all_urls(self):
         all_urls = []

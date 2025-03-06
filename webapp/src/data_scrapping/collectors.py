@@ -11,6 +11,7 @@ from src.data_scrapping.collectors_registry import Registry
 
 logger = logging.getLogger(__name__)
 
+
 @Registry.register()
 class LeMonde(DataCollector):
     def __init__(self, begin_date, end_date, timeout):

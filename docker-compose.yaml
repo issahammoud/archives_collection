@@ -7,15 +7,36 @@ services:
     container_name: webapp_container
     ports:
       - "8050:8050"
-      - "8888:8888" # to run jupyter for testing
+      # - "8888:8888" # uncomment if you want to run jupyter for testing
     depends_on:
       - db
-      # - embedding
+      - redis
     env_file:
       - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    user: "${UID}:${GID}"
     volumes:
-      - ./webapp/:/webapp
+      # - ./webapp/:/webapp # uncomment if you want changes to takes effect directly
+      - ~/archives_collection_images:/images
 
+  celery:
+    build:
+      context: webapp/
+      dockerfile: Dockerfile
+    container_name: celery_worker
+    command: celery -A src.main.celery_app.celery_app worker --loglevel=info
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - db
+    user: "${UID}:${GID}"
+    volumes:
+      # - ./webapp/:/webapp # uncomment if you want changes to takes effect directly
+      - ~/archives_collection_images:/images
 
   db:
     image: postgres:14
@@ -31,6 +52,13 @@ services:
       nproc: 65535
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ~/archives_collection_images:/images
+
+  redis:
+    image: redis:7.4.2
+    ports:
+      - "6379:6379"
+
 
   # embedding:
   #   build:

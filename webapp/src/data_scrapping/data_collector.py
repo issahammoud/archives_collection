@@ -6,10 +6,10 @@ from bs4 import BeautifulSoup
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, date
 
-from src.utils.utils import hash_url
 from src.helpers.enum import DBCOLUMNS
 from src.helpers.db_connector import DBConnector
 from src.data_scrapping.strategy import StrategyFactory
+from src.utils.utils import hash_url, save_image, get_image_path
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ class DataCollector(ABC):
         self._translation_table = str.maketrans("éàèùâêîôûç", "eaeuaeiouc")
         self._fetch_strategy = StrategyFactory(self)
         self.engine = None
+        self._data_dir = "/images/"
 
     def _init_engine(self):
         if self.engine is None:
@@ -61,7 +62,7 @@ class DataCollector(ABC):
             for date in all_dates
         ]
         df = pd.DataFrame(all_urls, columns=["date", "str_format"])
-        return df.drop_duplicates("str_format").sample(frac=1).values
+        return df.drop_duplicates("str_format").values[::-1]
 
     def get_url_content(self, url):
         return self._fetch_strategy.get_url_content(url)
@@ -87,6 +88,12 @@ class DataCollector(ABC):
                         data[DBCOLUMNS.date] = date
                         data[DBCOLUMNS.link] = section_url
                         data[DBCOLUMNS.rowid] = hash_url(section_url)
+                        img_path = get_image_path(
+                            self._data_dir, date, data[DBCOLUMNS.rowid]
+                        )
+                        save_image(img_path, data[DBCOLUMNS.image])
+                        data[DBCOLUMNS.image] = img_path
+
                         logger.debug(f"[{self.archive}]: Parsed a section successfully")
                         data_list.append(data)
 
