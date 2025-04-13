@@ -566,7 +566,7 @@ class Main:
 
 class Layout:
     SLIDES = 3
-    MAX_PAGES = 20
+    MAX_PAGES = 10
 
     @staticmethod
     def get_footer():

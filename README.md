@@ -2,7 +2,7 @@
 
 Archives Collection is a Python-based project designed to collect and visualize data from news archives websites. The system is built with a robust, modular architecture that leverages multiple design patterns to ensure scalability and maintainability. It has been proven at scale by successfully collecting millions of data points, opening the door to many AI and advanced analytics applications.
 
-> **Important:**  
+> **Important:**
 > The collected data is subject to copyright laws. This project is intended for educational and research purposes only. You must ensure that your use of any data complies with all applicable copyright regulations. The author does not encourage any breach of copyright.
 
 ## Table of Contents
@@ -35,14 +35,6 @@ Archives Collection automates the process of collecting and visualizing news arc
 - **Advanced Search:** Uses PostgreSQL with SQLAlchemy and tsvector for efficient full-text search.
 - **Containerized Deployment:** Managed via Makefile, Docker, and Docker Compose for easy build, run, stop, and cleanup operations.
 
-## Architecture
-
-The project is organized into distinct layers:
-- **Data Collection:** Uses Selenium and Cloudscaper to scrape news archives. Design patterns ensure that collectors are modular and easily extensible.
-- **Aggregation:** An aggregator component consolidates data from 16 collectors.
-- **Backend Processing:** Dash callbacks coordinate interactions between the front end and asynchronous background tasks managed by Celery (with Redis as the broker).
-- **Database Layer:** A PostgreSQL database, accessed via SQLAlchemy and enhanced with tsvector, stores and indexes the collected data for full-text search.
-- **Frontend Visualization:** A Dash-based dashboard (with Dash Mantine Components) presents real-time visualizations and interactive exploration of the data.
 
 ## Technologies
 
@@ -55,6 +47,12 @@ The project is organized into distinct layers:
 
 ## Installation
 
+Before running this project, make sure you have Docker and Docker Compose installed (see the [official Docker documentation](https://docs.docker.com/engine/install/ubuntu/)). Additionally, install GNU Make, Python 3, and the PostgreSQL client using the following commands:
+
+```bash
+sudo apt update && sudo apt install -y make python3 python3-pip postgresql-client
+```
+
 1. **Clone the Repository:**
 
    ```bash
@@ -63,7 +61,13 @@ The project is organized into distinct layers:
 
 2. **Configure Environment Variables**
 
-    Create or update a .env file with your database credentials and other configuration settings.
+    Create or update a `.env` file with your database credentials and other configuration settings. It should include the following variables:
+    ```
+    POSTGRES_USER=
+    POSTGRES_PASSWORD=
+    POSTGRES_DB=
+    ```
+    Those variables will be automatically used the first time to create and set the database and the user.
 
 3. **Build and Run Containers:**
 
@@ -94,67 +98,67 @@ The project is organized into distinct layers:
 
 ## Usage
 
-- **Data Collection:**  
+- **Data Collection:**
   The data collection process is automated via Cloudscaper and Selenium. The collectors are aggregated into a single system that processes multiple sources concurrently.
 
-- **Visualization:**  
+- **Visualization:**
   Once the data is collected, access the interactive dashboard at [http://localhost:8050](http://localhost:8050) to explore visualizations and start collecting data.
 
-- **Background Processing:**  
+- **Background Processing:**
   Long-running tasks (e.g., data collection) are handled asynchronously using Celery with Redis.
 
-- **Search:**  
+- **Search:**
   Utilize the PostgreSQL-backed full-text search powered by SQLAlchemy and tsvector to quickly query large datasets.
 
 ## Modules
 
 ### Data Collection
 
-- **Scraping Engine:**  
+- **Scraping Engine:**
   Uses Selenium and Cloudscaper to fetch data from news archives.
 
-- **Design Patterns:**  
+- **Design Patterns:**
   Implements Decorator, Registry, Strategy, and Factory patterns for a clean, scalable codebase.
 
-- **Collectors:**  
+- **Collectors:**
   16 individual collectors can be aggregated for comprehensive data collection.
 
 ### Visualization
 
-- **Dash Dashboard:**  
+- **Dash Dashboard:**
   An interactive front end built with Dash and enhanced with Dash Mantine Components for a modern user interface.
 
-- **Real-Time Updates:**  
+- **Real-Time Updates:**
   Dynamic dashboards that update as new data is collected.
 
 ### Backend
 
-- **Dash Callbacks:**  
+- **Dash Callbacks:**
   Orchestrate interactions between the front end and backend processes.
 
-- **Celery & Redis:**  
+- **Celery & Redis:**
   Manage long-running tasks asynchronously.
 
 ### Database
 
-- **PostgreSQL:**  
+- **PostgreSQL:**
   Stores the collected data.
 
-- **SQLAlchemy:**  
+- **SQLAlchemy:**
   Serves as the ORM for database interactions.
 
-- **TSVECTOR:**  
+- **TSVECTOR:**
   Enables efficient full-text search capabilities.
 
 ## Future Work
 
-- **AI and Advanced Analytics:**  
+- **AI and Advanced Analytics:**
   Dedicated modules for applying AI techniques and advanced analytics to the collected data.
 
-- **Enhanced Visualizations:**  
+- **Enhanced Visualizations:**
   Additional dashboard components and interactive features to further improve data exploration.
 
-- **Scalability Enhancements:**  
+- **Scalability Enhancements:**
   Further optimizations in the data collection and aggregation pipelines to handle even larger datasets.
 
 

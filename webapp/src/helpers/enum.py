@@ -3,11 +3,9 @@ from enum import Enum
 
 class Archives(str, Enum):
     lemonde = "lemonde"
-    lefigaro = "lefigaro"
     lesechos = "lesechos"
     vinghtminutes = "vinghtminutes"
     ouestfrance = "ouestfrance"
-    liberation = "liberation"
     mediapart = "mediapart"
     leparisien = "leparisien"
     lhumanite = "lhumanite"

@@ -91,10 +91,9 @@ class DataCollector(ABC):
                         img_path = get_image_path(
                             self._data_dir, date, data[DBCOLUMNS.rowid]
                         )
-                        save_image(img_path, data[DBCOLUMNS.image])
+                        img_path = save_image(img_path, data[DBCOLUMNS.image])
                         data[DBCOLUMNS.image] = img_path
 
-                        logger.debug(f"[{self.archive}]: Parsed a section successfully")
                         data_list.append(data)
 
                         if len(data_list) > 10:

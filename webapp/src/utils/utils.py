@@ -32,7 +32,7 @@ def resize_image_for_html(img_path, target_height=300):
     images were encoded in an unsupported format by those libraries.
     """
     try:
-        with WandImage(filename=img_path) as img:  # .replace("./data/", "/images/")
+        with WandImage(filename=img_path) as img:
             aspect_ratio = img.width / img.height
             new_width = int(target_height * aspect_ratio)
             img.resize(new_width, target_height)
@@ -47,14 +47,17 @@ def resize_image_for_html(img_path, target_height=300):
 
 
 def save_image(file_path, image_bytes, quality=80):
-    try:
-        with WandImage(blob=image_bytes) as img:
-            img.quality = quality
-            img.format = "webp"
-            img.save(filename=file_path)
-    except Exception:
-        with open(file_path, "wb") as file:
-            file.write(image_bytes)
+    if image_bytes is not None:
+        try:
+            with WandImage(blob=image_bytes) as img:
+                img.quality = quality
+                img.format = "webp"
+                img.save(filename=file_path)
+        except Exception:
+            with open(file_path, "wb") as file:
+                file.write(image_bytes)
+        finally:
+            return file_path
 
 
 def get_image_path(data_dir, date, rowid):

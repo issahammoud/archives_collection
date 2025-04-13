@@ -4,6 +4,7 @@ import numpy as np
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from src.helpers.enum import DBCOLUMNS
 from src.utils.utils import alternate_elements
 from src.helpers.db_connector import DBConnector
 from src.data_scrapping.collectors_registry import Registry
@@ -14,19 +15,38 @@ engine = DBConnector.get_engine()
 
 
 class CollectorsAggregator:
-    def __init__(self, **kwargs) -> None:
-        self.collectors = Registry.create_all(**kwargs)
+    def __init__(self, name_list=None, **kwargs) -> None:
+        self.collectors = (
+            Registry.create_list(name_list, **kwargs)
+            if name_list
+            else Registry.create_all(**kwargs)
+        )
         assert (
             len(self.collectors) > 0
         ), f"Found {len(self.collectors)} collectors. Should have at least 1."
-
         self.workers = len(self.collectors)
+
+    def _eliminate_done_dates(self, urls, archive):
+        new_urls = []
+        done_dates = set(
+            DBConnector.get_done_dates(
+                engine,
+                DBConnector.TABLE,
+                filters={DBCOLUMNS.archive: [("eq", archive)]},
+            )
+        )
+        for date, url in urls:
+            if date not in done_dates:
+                new_urls.append((date, url))
+        return new_urls
 
     def get_all_urls(self):
         all_urls = []
 
         for collector in self.collectors:
-            all_urls.append(collector.get_all_urls())
+            urls = collector.get_all_urls()
+            urls = self._eliminate_done_dates(urls, collector.archive)
+            all_urls.append(urls)
 
         all_urls = alternate_elements(all_urls)
         assert len(all_urls) > 0, "No pages to collect"

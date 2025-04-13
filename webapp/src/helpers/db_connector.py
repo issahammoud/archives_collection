@@ -14,7 +14,7 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
 )
 from sqlalchemy.sql import and_
-from sqlalchemy.types import String, DateTime, LargeBinary, Text
+from sqlalchemy.types import String, DateTime, Text
 
 from src.utils.logging import logging
 from src.helpers.enum import DBCOLUMNS
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 class DBConnector:
 
-    TABLE = "test_table"
+    TABLE = "articles"
 
     operator_map = {
         "eq": lambda column, value: column == value,
@@ -65,9 +65,10 @@ class DBConnector:
     @staticmethod
     def create_table(engine, table):
         metadata = MetaData()
+        has_table = DBConnector.has_table(engine, table)
 
-        if not DBConnector.has_table(engine, table):
-            print(f"creating table {table}")
+        if not has_table:
+            logger.info(f"creating table {table}")
             table_ref = Table(
                 table,
                 metadata,
@@ -126,6 +127,7 @@ class DBConnector:
                     f"USING GIN ({column_name})"
                 )
             )
+            connection.commit()
 
     @staticmethod
     def apply_filters(query, table_ref, filters):
@@ -165,14 +167,12 @@ class DBConnector:
 
     @has_table_decorator
     @staticmethod
-    def get_done_dates(engine, table, archive, filters=None):
+    def get_done_dates(engine, table, filters=None):
         metadata = MetaData()
         table_ref = Table(table, metadata, autoload_with=engine)
 
         with engine.connect() as connection:
-            query = select(table_ref.c[DBCOLUMNS.date]).where(
-                table_ref.c[DBCOLUMNS.archive] == archive
-            )
+            query = select(table_ref.c[DBCOLUMNS.date])
 
             query = DBConnector.apply_filters(query, table_ref, filters)
 

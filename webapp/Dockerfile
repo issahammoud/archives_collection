@@ -5,10 +5,7 @@ WORKDIR /webapp
 
 RUN apt-get update && \
     apt-get install -y \
-    libmagickwand-dev curl chromium-driver htop && \
-    curl -LO https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
-    apt-get install -y ./google-chrome-stable_current_amd64.deb && \
-    rm google-chrome-stable_current_amd64.deb \
+    libmagickwand-dev curl htop && \
     rm -rf /var/lib/apt/lists/*
 
 
@@ -23,4 +20,4 @@ ENV PYTHONPATH=/webapp
 EXPOSE 8050
 
 CMD gunicorn -w 4 -b 0.0.0.0:8050 src.main.app:server
-# CMD ["python3", "src/main/app.py"] # replace the gunicorn cmd with this for testing
+# CMD ["python3", "src/main/app.py"]

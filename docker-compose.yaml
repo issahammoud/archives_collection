@@ -1,42 +1,35 @@
 services:
 
-  webapp:
+  webapp_base: &webapp_base
     build:
       context: webapp/
       dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - SELENIUM_REMOTE_URL=http://selenium:4444
+    depends_on:
+      - db
+      - redis
+    user: "${UID}:${GID}"
+    volumes:
+      - ./webapp/:/webapp
+      - ~/archives_collection_images:/images
+
+  webapp:
+    <<: *webapp_base
     container_name: webapp_container
     ports:
       - "8050:8050"
-      # - "8888:8888" # uncomment if you want to run jupyter for testing
-    depends_on:
-      - db
-      - redis
-    env_file:
-      - .env
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-    user: "${UID}:${GID}"
-    volumes:
-      # - ./webapp/:/webapp # uncomment if you want changes to takes effect directly
-      - ~/archives_collection_images:/images
+      - "8888:8888"
 
   celery:
-    build:
-      context: webapp/
-      dockerfile: Dockerfile
+    <<: *webapp_base
     container_name: celery_worker
     command: celery -A src.main.celery_app.celery_app worker --loglevel=info
-    env_file:
-      - .env
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-    depends_on:
-      - redis
-      - db
-    user: "${UID}:${GID}"
-    volumes:
-      # - ./webapp/:/webapp # uncomment if you want changes to takes effect directly
-      - ~/archives_collection_images:/images
+    cpu_period: 100000
+    cpu_quota: 1000000
 
   db:
     image: postgres:14
@@ -58,24 +51,6 @@ services:
     image: redis:7.4.2
     ports:
       - "6379:6379"
-
-
-  # embedding:
-  #   build:
-  #     context: embedding/
-  #     dockerfile: Dockerfile
-  #   container_name: embedding_container
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         devices:
-  #           - driver: nvidia
-  #             count: 1
-  #             capabilities: [gpu]
-  #   ports:
-  #     - "8000:8000"
-  #   volumes:
-  #     - ./embedding/:/embedding
 
   precommit:
     build:

@@ -1,3 +1,4 @@
+import copy
 import dash
 import logging
 import pandas as pd
@@ -15,7 +16,7 @@ engine = DBConnector.get_engine()
 
 
 def get_filters_dict(archive, tag, date_range, submit, null_clicks, query):
-    filters = {DBCOLUMNS.date: [("ge", date_range[0])]}
+    filters = {DBCOLUMNS.date: [("ge", date_range[0])]} if date_range[0] else {}
     if date_range[1]:
         filters[DBCOLUMNS.date].append(("le", date_range[1]))
 
@@ -36,7 +37,6 @@ def get_filters_dict(archive, tag, date_range, submit, null_clicks, query):
         if null_clicks is not None and null_clicks % 2
         else {}
     )
-
     return filters
 
 
@@ -261,8 +261,12 @@ def download(n_clicks, states):
 def start_collection(n_clicks, states):
     if n_clicks:
         date_range = states.get("date_range")
+        archive = states.get("archive")
+
         try:
-            task = collection_task.apply_async(args=(date_range[0], date_range[1]))
+            task = collection_task.apply_async(
+                args=(archive, date_range[0], date_range[1])
+            )
             return {"task_id": task.id, "status": "start"}, False
         except Exception as e:
             print(f"Failed to start task: {str(e)}")

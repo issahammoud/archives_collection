@@ -5,9 +5,9 @@ class Registry:
     _registry = {}
 
     @classmethod
-    def register(cls):
+    def register(cls, name):
         def wrapper(subclass):
-            cls._registry[subclass.__name__] = subclass
+            cls._registry[name] = subclass
             return subclass
 
         return wrapper
@@ -22,13 +22,19 @@ class Registry:
         assert name in cls._registry, f"Class '{name}' is not registered."
         collector = cls._registry[name](*args, **kwargs)
         collector = AddPages(collector)
-        collector = EliminateRedundancy(collector)
         return collector
 
     @classmethod
     def create_all(cls, *args, **kwargs):
         collectors = []
         for name in cls.list_registered():
+            collectors.append(cls.create(name, *args, **kwargs))
+        return collectors
+
+    @classmethod
+    def create_list(cls, name_list, *args, **kwargs):
+        collectors = []
+        for name in name_list:
             collectors.append(cls.create(name, *args, **kwargs))
         return collectors
 
