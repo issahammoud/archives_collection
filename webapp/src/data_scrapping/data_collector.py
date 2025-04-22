@@ -1,6 +1,8 @@
 import re
+import os
 import logging
 import dateparser
+import numpy as np
 import pandas as pd
 from bs4 import BeautifulSoup
 from abc import ABC, abstractmethod
@@ -9,7 +11,7 @@ from datetime import datetime, timedelta, date
 from src.helpers.enum import DBCOLUMNS
 from src.helpers.db_connector import DBConnector
 from src.data_scrapping.strategy import StrategyFactory
-from src.utils.utils import hash_url, save_image, get_image_path
+from src.utils.utils import hash_url, save_image, get_image_path, get_embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,7 @@ class DataCollector(ABC):
         self._fetch_strategy = StrategyFactory(self)
         self.engine = None
         self._data_dir = "/images/"
+        self._embedding_url = os.getenv("EMBED_URL")
 
     def _init_engine(self):
         if self.engine is None:
@@ -93,31 +96,35 @@ class DataCollector(ABC):
                         )
                         img_path = save_image(img_path, data[DBCOLUMNS.image])
                         data[DBCOLUMNS.image] = img_path
-
                         data_list.append(data)
 
-                        if len(data_list) > 10:
-                            DBConnector.insert_row(
-                                self.engine, DBConnector.TABLE, data_list
-                            )
+                        if len(data_list) >= 32:
+                            self.insert_batch(data_list)
                             data_list = []
 
                 except Exception as e:
                     logger.debug(f"Exception in parsing section from page {url}")
                     logger.debug(e)
-                    if len(data_list):
-                        DBConnector.insert_row(
-                            self.engine, DBConnector.TABLE, data_list
-                        )
+                    if len(data_list) >= 32:
+                        self.insert_batch(data_list)
                         data_list = []
 
-            if len(data_list):
-                DBConnector.insert_row(self.engine, DBConnector.TABLE, data_list)
+            if len(data_list) >= 32:
+                self.insert_batch(data_list)
                 data_list = []
 
         except Exception as e:
             logger.debug(f"Exception in parsing page {url}")
             logger.debug(e)
+
+    def insert_batch(self, data_list):
+        list_ = []
+        embeddings = get_embeddings(data_list, self._embedding_url)
+        for data, emb in zip(data_list, embeddings):
+            data[DBCOLUMNS.embedding] = emb
+            list_.append(data)
+
+        DBConnector.insert_row(self.engine, DBConnector.TABLE, list_)
 
     @abstractmethod
     def get_section_url(self, section):

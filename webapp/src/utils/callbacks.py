@@ -1,13 +1,13 @@
-import copy
+import os
 import dash
 import logging
 import pandas as pd
 from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import Input, State, Output, callback, dcc
 from src.helpers.enum import DBCOLUMNS
-from src.utils.utils import prepare_query
 from src.helpers.db_connector import DBConnector
 from src.helpers.layout import Layout, Navbar, Main
+from src.utils.utils import prepare_query, get_query_embedding
 from src.utils.celery_tasks import collection_task, revoke_task
 
 
@@ -24,13 +24,23 @@ def get_filters_dict(archive, tag, date_range, submit, null_clicks, query):
 
     filters.update({DBCOLUMNS.archive: [("in", archive)]} if archive else {})
 
-    filters.update(
-        {
-            DBCOLUMNS.text_searchable: [("text_search", prepare_query(query))],
-        }
-        if submit and query
-        else {}
-    )
+    if submit and query:
+        if len(query.split()) == 1:
+
+            filters.update(
+                {DBCOLUMNS.text_searchable: [("text_search", prepare_query(query))]}
+            )
+        else:
+            filters.update(
+                {
+                    DBCOLUMNS.embedding: [
+                        (
+                            "similarity",
+                            get_query_embedding(query, os.getenv("EMBED_URL")),
+                        )
+                    ]
+                }
+            )
 
     filters.update(
         {DBCOLUMNS.image: [("notnull", None)]}

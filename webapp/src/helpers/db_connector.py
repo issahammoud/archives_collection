@@ -14,6 +14,7 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
 )
 from sqlalchemy.sql import and_
+from pgvector.sqlalchemy import Vector, HALFVEC
 from sqlalchemy.types import String, DateTime, Text
 
 from src.utils.logging import logging
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 class DBConnector:
 
     TABLE = "articles"
+    VECTOR_DIM = 1024
 
     operator_map = {
         "eq": lambda column, value: column == value,
@@ -40,6 +42,12 @@ class DBConnector:
         "text_search": lambda column, value: text(
             f"{column.name} @@ to_tsquery('french', :query)"
         ).bindparams(query=value),
+        "similarity": lambda column, value: text(
+            f"{column.name} <#> :query < :threshold"
+        ).bindparams(
+            bindparam("query", value, type_=Vector(DBConnector.VECTOR_DIM)),
+            bindparam("threshold", -0.5),
+        ),
     }
 
     @staticmethod
@@ -80,26 +88,33 @@ class DBConnector:
                 Column(DBCOLUMNS.content.value, String, nullable=True),
                 Column(DBCOLUMNS.tag.value, String, nullable=True),
                 Column(DBCOLUMNS.link.value, String, nullable=False, unique=True),
+                Column(
+                    DBCOLUMNS.embedding.value,
+                    HALFVEC(DBConnector.VECTOR_DIM),
+                    nullable=False,
+                ),
                 PrimaryKeyConstraint(DBCOLUMNS.rowid.value),
             )
 
             metadata.create_all(engine)
 
             index_asc = Index(
-                "index_rowid_date_asc",
+                "rowid_date_asc_index",
                 table_ref.c[DBCOLUMNS.rowid].asc(),
                 table_ref.c[DBCOLUMNS.date].asc(),
             )
             index_asc.create(bind=engine)
 
             index_desc = Index(
-                "index_rowid_date_desc",
+                "rowid_date_desc_index",
                 table_ref.c[DBCOLUMNS.rowid].desc(),
                 table_ref.c[DBCOLUMNS.date].desc(),
             )
             index_desc.create(bind=engine)
 
             DBConnector.add_searchable_column(engine, table, DBCOLUMNS.text_searchable)
+            DBConnector.add_vector_index(engine, table, DBCOLUMNS.embedding.value)
+
             return table_ref
 
         return Table(DBConnector.TABLE, metadata, autoload_with=engine)
@@ -123,8 +138,19 @@ class DBConnector:
             )
             connection.execute(
                 text(
-                    f"CREATE INDEX {column_name}_idx ON {table} "
+                    f"CREATE INDEX {column_name}_index ON {table} "
                     f"USING GIN ({column_name})"
+                )
+            )
+            connection.commit()
+
+    @staticmethod
+    def add_vector_index(engine, table, column_name):
+        with engine.connect() as connection:
+            connection.execute(
+                text(
+                    f"CREATE INDEX {column_name}_index ON {table} "
+                    f"USING hnsw ({column_name} halfvec_cosine_ops)"
                 )
             )
             connection.commit()
@@ -330,7 +356,19 @@ class DBConnector:
                     )
                 )
 
-        query = query.order_by(*order_by_clause).limit(limit)
+        if DBCOLUMNS.embedding in filters:
+            embedding_vector = filters[DBCOLUMNS.embedding][0][1]
+            query = query.order_by(
+                text("embedding <#> :query").bindparams(
+                    bindparam(
+                        "query",
+                        embedding_vector,
+                        type_=Vector(DBConnector.VECTOR_DIM),
+                    )
+                )
+            ).limit(limit)
+        else:
+            query = query.order_by(*order_by_clause).limit(limit)
 
         with engine.connect() as connection:
             result = connection.execute(query)

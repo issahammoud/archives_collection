@@ -78,7 +78,7 @@ class Header:
         )
         tooltip = dmc.Tooltip(
             button,
-            label="Enroll for free in Intuitive Deep Learning Course",
+            label="Enroll in Intuitive Deep Learning Course",
             multiline=True,
             withArrow=True,
             openDelay=3,
@@ -177,7 +177,6 @@ class Navbar:
                 circle=True,
                 p=2,
             ),
-            id="badge",
             label=f"{count} articles",
             multiline=True,
             withArrow=True,
@@ -258,7 +257,7 @@ class Navbar:
             position="top",
         )
 
-        badge = Navbar.get_badge(total_count)
+        badge = html.Div(Navbar.get_badge(total_count), id="badge")
         return dmc.Grid(
             [
                 dmc.GridCol(badge, span=4),
@@ -270,7 +269,7 @@ class Navbar:
 
     @staticmethod
     def group_by_btn(total_count):
-        value = "day" if total_count < 1e4 else "month"
+        value = "day" if total_count < 5e4 else "month"
         value = value if total_count < 1e6 else "year"
         target = dmc.Tooltip(
             dmc.ActionIcon(

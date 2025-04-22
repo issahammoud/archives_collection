@@ -15,4 +15,5 @@ dateparser==1.2.0
 Wand==0.6.13
 pyspellchecker==0.8.2
 cloudscraper==1.2.71
-selenium==4.27.1
+pgvector==0.3.6
+orjson==3.10.12

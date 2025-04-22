@@ -38,5 +38,4 @@ help:
 	@echo "  make stop                - Stop the service"
 	@echo "  make clean               - Clean up Docker resources"
 	@echo "  make jupyter             - Run a jupyter notebook"
-	@echo "  make webapp              - Run a jupyter notebook"
 	@echo "  make help                - Show this help message"

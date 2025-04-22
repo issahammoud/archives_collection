@@ -1,13 +1,20 @@
 import re
 import os
 import base64
+import orjson
 import hashlib
+import logging
+import requests
 import itertools
 import numpy as np
 from functools import wraps
 from sqlalchemy import inspect
 from spellchecker import SpellChecker
 from wand.image import Image as WandImage
+
+from src.helpers.enum import DBCOLUMNS
+
+logger = logging.getLogger(__name__)
 
 
 def alternate_elements(list_of_list):
@@ -130,3 +137,45 @@ def is_image_url(url):
         r"\.(jpg|jpeg|png|gif|bmp|svg|webp|tiff)$", re.IGNORECASE
     )
     return bool(image_pattern.search(url))
+
+
+def get_embeddings(batch, embedding_url, timeout=20):
+
+    payload = prepare_payload(batch)
+
+    try:
+        resp = requests.post(embedding_url, json=payload, timeout=timeout)
+        resp.raise_for_status()
+        data = orjson.loads(resp.content)
+        embeddings = np.array(data["embeddings"])
+        return embeddings
+
+    except Exception as e:
+        logger.error(f"Error fetching embeddings for batch of size {len(batch)}: {e}")
+        return None
+
+
+def prepare_payload(batch):
+    data = []
+
+    for el in batch:
+        text = ""
+        text += f"title: {el[DBCOLUMNS.title]}\n" if el[DBCOLUMNS.title] else ""
+        text += f"content: {el[DBCOLUMNS.content]}\n" if el[DBCOLUMNS.content] else ""
+        text += f"topic: {el[DBCOLUMNS.tag]}" if el[DBCOLUMNS.tag] else ""
+        data.append(text)
+
+    return {"data": data}
+
+
+def get_query_embedding(query, embedding_url, timeout=20):
+    try:
+        resp = requests.post(embedding_url, json={"data": [query]}, timeout=timeout)
+        resp.raise_for_status()
+        data = orjson.loads(resp.content)
+        embeddings = np.array(data["embeddings"])
+        return embeddings.ravel().tolist()
+
+    except Exception as e:
+        logger.error(f"Error fetching embeddings for query {query}: {e}")
+        return None

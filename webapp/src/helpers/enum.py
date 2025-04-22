@@ -5,17 +5,13 @@ class Archives(str, Enum):
     lemonde = "lemonde"
     lesechos = "lesechos"
     vinghtminutes = "vinghtminutes"
-    ouestfrance = "ouestfrance"
-    mediapart = "mediapart"
     leparisien = "leparisien"
-    lhumanite = "lhumanite"
     lepoint = "lepoint"
     lorient = "lorient"
     rfi = "rfi"
     franceinfo = "franceinfo"
     lalsace = "lalsace"
     france24 = "france24"
-    mondediplomatique = "mondediplomatique"
 
 
 class DBCOLUMNS(str, Enum):
@@ -27,6 +23,7 @@ class DBCOLUMNS(str, Enum):
     content = "content"
     tag = "tag"
     link = "link"
+    embedding = "embedding"
     text_searchable = "text_searchable"
 
 

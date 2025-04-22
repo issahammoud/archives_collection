@@ -8,10 +8,11 @@ services:
       - .env
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - SELENIUM_REMOTE_URL=http://selenium:4444
+      - EMBED_URL=http://embedding:8000/embed
     depends_on:
       - db
       - redis
+      - embedding
     user: "${UID}:${GID}"
     volumes:
       - ./webapp/:/webapp
@@ -32,7 +33,7 @@ services:
     cpu_quota: 1000000
 
   db:
-    image: postgres:14
+    image: pgvector/pgvector:pg14
     container_name: postgres_container
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -45,12 +46,32 @@ services:
       nproc: 65535
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
       - ~/archives_collection_images:/images
 
   redis:
     image: redis:7.4.2
     ports:
       - "6379:6379"
+
+  embedding:
+    container_name: embedding_container
+    build:
+      context: embedding/
+      dockerfile: Dockerfile
+      args:
+        torch_cuda_arch_list: ""
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./embedding/:/embedding
 
   precommit:
     build:

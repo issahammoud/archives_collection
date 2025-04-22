@@ -1,17 +1,9 @@
 import os
 import time
 import cloudscraper
-from selenium import webdriver
 from abc import ABC, abstractmethod
-
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-
 from src.helpers.enum import headers
 from src.utils.logging import logging
-from src.helpers.enum import Archives
-from src.utils.utils import is_image_url
 
 
 logger = logging.getLogger(__name__)
