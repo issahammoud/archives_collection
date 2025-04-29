@@ -20,4 +20,6 @@ celery_app.conf.update(
     task_time_limit=None,  # No time limit
     broker_transport_options={"visibility_timeout": 43200},
     worker_hijack_root_logger=False,
+    worker_redirect_stdouts=True,
+    worker_redirect_stdouts_level="DEBUG",
 )

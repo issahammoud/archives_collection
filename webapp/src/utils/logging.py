@@ -1,37 +1,33 @@
-import logging
 import logging.config
-
 
 LOGGING_CONFIG = {
     "version": 1,
-    "disable_existing_loggers": True,
+    "disable_existing_loggers": False,
     "formatters": {
         "standard": {"format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"},
     },
     "handlers": {
-        "default": {
+        "console": {
+            "class": "logging.StreamHandler",
             "level": "INFO",
             "formatter": "standard",
-            "class": "logging.StreamHandler",
             "stream": "ext://sys.stdout",
         },
         "file": {
+            "class": "logging.handlers.RotatingFileHandler",
             "level": "DEBUG",
-            "mode": "w",
             "formatter": "standard",
             "filename": "/tmp/logs.log",
-            "class": "logging.handlers.RotatingFileHandler",
-            "maxBytes": 1000000000,
+            "mode": "w",
+            "maxBytes": 1_000_000_000,
             "backupCount": 20,
         },
     },
+    "root": {"level": "DEBUG", "handlers": ["console", "file"]},
     "loggers": {
-        "": {"handlers": ["default", "file"], "level": "DEBUG", "propagate": False},
-        "__main__": {
-            "handlers": ["default", "file"],
-            "level": "INFO",
-            "propagate": False,
-        },
+        "uvicorn": {"level": "WARNING", "handlers": [], "propagate": False},
+        "uvicorn.error": {"level": "WARNING", "handlers": [], "propagate": False},
+        "uvicorn.access": {"level": "WARNING", "handlers": [], "propagate": False},
     },
 }
 

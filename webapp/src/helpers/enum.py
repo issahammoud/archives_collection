@@ -23,6 +23,7 @@ class DBCOLUMNS(str, Enum):
     content = "content"
     tag = "tag"
     link = "link"
+    hash = "hash"
     embedding = "embedding"
     text_searchable = "text_searchable"
 

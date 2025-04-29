@@ -1,12 +1,13 @@
 import logging
-
-from src.utils.utils import hash_url
+import numpy as np
+import pandas as pd
 from src.helpers.enum import DBCOLUMNS
 from src.helpers.db_connector import DBConnector
 from src.data_scrapping.data_collector import DataCollector
 
 
 logger = logging.getLogger(__name__)
+engine = DBConnector.get_engine()
 
 
 class Decorator(DataCollector):
@@ -77,22 +78,41 @@ class AddPages(Decorator):
         return sections, None
 
 
-class EliminateRedundancy(Decorator):
+class RemoveDoneDates(Decorator):
     def __init__(self, collector):
         super().__init__(collector)
-        self._done = None
+        date_range = [self._collector.begin_date, self._collector.end_date]
+        self._filters = {
+            DBCOLUMNS.archive: [("eq", self._collector.archive)],
+            DBCOLUMNS.date: [("ge", date_range[0]), ("le", date_range[1])],
+        }
+        self._done_dates = DBConnector.get_done_dates(
+            engine,
+            DBConnector.TABLE,
+            filters=self._filters,
+        )
 
-    def _lazy_load_rowids(self):
-        if self._done is None:
-            self._done = set(
-                DBConnector.get_all_rowid(
-                    self.engine,
+        self._done_urls = None
+
+    def get_all_urls(self):
+        all_urls = super().get_all_urls()
+        done_dates = list(zip(self._done_dates, [None] * len(self._done_dates)))
+
+        df = pd.DataFrame(all_urls + done_dates, columns=["date", "str_format"])
+        return df.drop_duplicates("date", keep=False).dropna().values[::-1].tolist()
+
+    def _lazy_load_urls(self):
+        if self._done_urls is None:
+            self._done_urls = set(
+                DBConnector.get_all_rows(
+                    engine,
                     DBConnector.TABLE,
-                    filters={DBCOLUMNS.archive: [("eq", self._collector.archive)]},
+                    filters=self._filters,
+                    columns=[DBCOLUMNS.link],
                 )
             )
 
     def get_section_url(self, section):
-        self._lazy_load_rowids()
-        url = self._collector.get_section_url(section)
-        return None if hash_url(url) in self._done else url
+        self._lazy_load_urls()
+        section_url = super().get_section_url(section)
+        return section_url if section_url not in self._done_urls else None

@@ -8,11 +8,14 @@ services:
       - .env
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - EMBED_URL=http://embedding:8000/embed
+      - EMBED_URL=http://embedding:8000/v1/embeddings
     depends_on:
-      - db
-      - redis
-      - embedding
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+      embedding:
+        condition: service_healthy
     user: "${UID}:${GID}"
     volumes:
       - ./webapp/:/webapp
@@ -28,7 +31,7 @@ services:
   celery:
     <<: *webapp_base
     container_name: celery_worker
-    command: celery -A src.main.celery_app.celery_app worker --loglevel=info
+    command: celery -A src.main.celery_app.celery_app worker --loglevel=debug
     cpu_period: 100000
     cpu_quota: 1000000
 
@@ -39,6 +42,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+    shm_size: '2gb'
     ulimits:
       nofile:
         soft: 65535
@@ -70,8 +74,14 @@ services:
               capabilities: [gpu]
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - ./embedding/:/embedding
+      - hf_cache:/root/.cache/huggingface
 
   precommit:
     build:
@@ -85,3 +95,4 @@ services:
 
 volumes:
   postgres_data:
+  hf_cache:

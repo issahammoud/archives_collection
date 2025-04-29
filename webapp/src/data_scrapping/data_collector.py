@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, date
 from src.helpers.enum import DBCOLUMNS
 from src.helpers.db_connector import DBConnector
 from src.data_scrapping.strategy import StrategyFactory
-from src.utils.utils import hash_url, save_image, get_image_path, get_embeddings
+from src.utils.utils import save_image, get_image_path, get_embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ class DataCollector(ABC):
             for date in all_dates
         ]
         df = pd.DataFrame(all_urls, columns=["date", "str_format"])
-        return df.drop_duplicates("str_format").values[::-1]
+        return df.drop_duplicates("str_format").values[::-1].tolist()
 
     def get_url_content(self, url):
         return self._fetch_strategy.get_url_content(url)
@@ -90,10 +90,7 @@ class DataCollector(ABC):
 
                         data[DBCOLUMNS.date] = date
                         data[DBCOLUMNS.link] = section_url
-                        data[DBCOLUMNS.rowid] = hash_url(section_url)
-                        img_path = get_image_path(
-                            self._data_dir, date, data[DBCOLUMNS.rowid]
-                        )
+                        img_path = get_image_path(self._data_dir, date, section_url)
                         img_path = save_image(img_path, data[DBCOLUMNS.image])
                         data[DBCOLUMNS.image] = img_path
                         data_list.append(data)

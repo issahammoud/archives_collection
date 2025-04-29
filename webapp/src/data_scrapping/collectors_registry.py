@@ -1,4 +1,4 @@
-from src.data_scrapping.decorators import AddPages, EliminateRedundancy
+from src.data_scrapping.decorators import AddPages, RemoveDoneDates
 
 
 class Registry:
@@ -22,6 +22,7 @@ class Registry:
         assert name in cls._registry, f"Class '{name}' is not registered."
         collector = cls._registry[name](*args, **kwargs)
         collector = AddPages(collector)
+        collector = RemoveDoneDates(collector)
         return collector
 
     @classmethod

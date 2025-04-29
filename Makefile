@@ -25,11 +25,13 @@ clean:
 	@if [ -n "$$(docker images -aq)" ]; then docker rmi -f $$(docker images -aq); fi
 	docker system prune -f
 
-
 jupyter:
 	@echo "Run a jupyter notebook. Connect to localhost:8888 from your editor..."
 	docker exec -it webapp_container bash -c 'export HOME=/tmp && jupyter notebook --ip=0.0.0.0 --port=8888 --allow-root --IdentityProvider.token=""'
 
+logs:
+	@echo "Showing data collection logs..."
+	docker exec -it celery_worker tail -f /tmp/logs.log
 
 help:
 	@echo "Available commands:"
@@ -38,4 +40,5 @@ help:
 	@echo "  make stop                - Stop the service"
 	@echo "  make clean               - Clean up Docker resources"
 	@echo "  make jupyter             - Run a jupyter notebook"
+	@echo "  make logs                - Show data collection logs"
 	@echo "  make help                - Show this help message"

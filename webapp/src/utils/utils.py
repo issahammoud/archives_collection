@@ -29,10 +29,6 @@ def alternate_elements(list_of_list):
     return list(zip(col_1, col_2))
 
 
-def hash_url(url):
-    return hashlib.sha256(url.encode("utf-8")).hexdigest()
-
-
 def resize_image_for_html(img_path, target_height=300):
     """
     We used this library instead of PIL or cv2 because many
@@ -67,7 +63,8 @@ def save_image(file_path, image_bytes, quality=80):
             return file_path
 
 
-def get_image_path(data_dir, date, rowid):
+def get_image_path(data_dir, date, section_url):
+    hash_url = hashlib.sha256(section_url.encode("utf-8")).hexdigest()
     try:
         year = date.year
         month = date.month
@@ -77,7 +74,7 @@ def get_image_path(data_dir, date, rowid):
 
     subdir = os.path.join(data_dir, str(year), str(month))
     os.makedirs(subdir, exist_ok=True)
-    file_name = f"{rowid}.webp"
+    file_name = f"{hash_url}.webp"
     file_path = os.path.join(subdir, file_name)
     return file_path
 
@@ -114,22 +111,6 @@ def has_table_decorator(func):
         return func(*args, **kwargs)
 
     return wrapper
-
-
-def prepare_query(query):
-    concatenated_words = []
-    spell = SpellChecker()
-    words = query.split()
-
-    new_words = [spell.correction(word) for word in words]
-
-    for word1, word2 in zip(words, new_words):
-        if word2:
-            concatenated_words.append(f"({word1} | {word2})")
-        else:
-            concatenated_words.append(word1)
-
-    return " & ".join(concatenated_words)
 
 
 def is_image_url(url):

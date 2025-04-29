@@ -10,8 +10,10 @@ from sqlalchemy import (
     text,
     Index,
     update,
+    Computed,
     bindparam,
-    PrimaryKeyConstraint,
+    BigInteger,
+    true,
 )
 from sqlalchemy.sql import and_
 from pgvector.sqlalchemy import Vector, HALFVEC
@@ -80,37 +82,43 @@ class DBConnector:
             table_ref = Table(
                 table,
                 metadata,
-                Column(DBCOLUMNS.rowid.value, String, nullable=False),
+                Column(
+                    DBCOLUMNS.rowid.value,
+                    BigInteger,
+                    primary_key=True,
+                    autoincrement=True,
+                ),
                 Column(DBCOLUMNS.date.value, DateTime, nullable=False),
                 Column(DBCOLUMNS.archive.value, String, nullable=False),
                 Column(DBCOLUMNS.image.value, Text, nullable=True),
                 Column(DBCOLUMNS.title.value, String, nullable=True),
                 Column(DBCOLUMNS.content.value, String, nullable=True),
                 Column(DBCOLUMNS.tag.value, String, nullable=True),
-                Column(DBCOLUMNS.link.value, String, nullable=False, unique=True),
+                Column(DBCOLUMNS.link.value, String, nullable=False),
+                Column(
+                    DBCOLUMNS.hash.value,
+                    BigInteger,
+                    Computed(
+                        f"hashtext({DBCOLUMNS.link.value})::BIGINT", persisted=True
+                    ),
+                    nullable=False,
+                    unique=True,
+                ),
                 Column(
                     DBCOLUMNS.embedding.value,
                     HALFVEC(DBConnector.VECTOR_DIM),
                     nullable=False,
                 ),
-                PrimaryKeyConstraint(DBCOLUMNS.rowid.value),
             )
+
+            index = Index(
+                "date_rowid_index",
+                table_ref.c[DBCOLUMNS.date],
+                table_ref.c[DBCOLUMNS.rowid],
+            )
+            index.create(bind=engine)
 
             metadata.create_all(engine)
-
-            index_asc = Index(
-                "rowid_date_asc_index",
-                table_ref.c[DBCOLUMNS.rowid].asc(),
-                table_ref.c[DBCOLUMNS.date].asc(),
-            )
-            index_asc.create(bind=engine)
-
-            index_desc = Index(
-                "rowid_date_desc_index",
-                table_ref.c[DBCOLUMNS.rowid].desc(),
-                table_ref.c[DBCOLUMNS.date].desc(),
-            )
-            index_desc.create(bind=engine)
 
             DBConnector.add_searchable_column(engine, table, DBCOLUMNS.text_searchable)
             DBConnector.add_vector_index(engine, table, DBCOLUMNS.embedding.value)
@@ -150,7 +158,7 @@ class DBConnector:
             connection.execute(
                 text(
                     f"CREATE INDEX {column_name}_index ON {table} "
-                    f"USING hnsw ({column_name} halfvec_cosine_ops)"
+                    f"USING hnsw ({column_name} halfvec_ip_ops)"
                 )
             )
             connection.commit()
@@ -197,15 +205,34 @@ class DBConnector:
         metadata = MetaData()
         table_ref = Table(table, metadata, autoload_with=engine)
 
+        counts_q = select(
+            table_ref.c[DBCOLUMNS.date].label("date"), func.count().label("freq")
+        ).group_by(table_ref.c[DBCOLUMNS.date])
+
+        counts_q = DBConnector.apply_filters(counts_q, table_ref, filters)
+        date_counts = counts_q.cte("date_counts")
+
+        median_cte = (
+            select(
+                func.percentile_cont(0.5)
+                .within_group(date_counts.c.freq)
+                .label("median_freq")
+            )
+            .select_from(date_counts)
+            .where(date_counts.c.freq > 0)
+            .cte("stats")
+        )
+
+        final_q = (
+            select(date_counts.c.date, date_counts.c.freq, median_cte.c.median_freq)
+            .select_from(date_counts.join(median_cte, true()))
+            .where(date_counts.c.freq > median_cte.c.median_freq * 0.9)
+            .order_by(date_counts.c.date)
+        )
+
         with engine.connect() as connection:
-            query = select(table_ref.c[DBCOLUMNS.date])
-
-            query = DBConnector.apply_filters(query, table_ref, filters)
-
-            query = query.distinct()
-
-            result = connection.execute(query)
-            return [row[0] for row in result]
+            result = connection.execute(final_q)
+            return [(row.date.date(), row.freq, row.median_freq) for row in result]
 
     @has_table_decorator
     @staticmethod
@@ -356,19 +383,7 @@ class DBConnector:
                     )
                 )
 
-        if DBCOLUMNS.embedding in filters:
-            embedding_vector = filters[DBCOLUMNS.embedding][0][1]
-            query = query.order_by(
-                text("embedding <#> :query").bindparams(
-                    bindparam(
-                        "query",
-                        embedding_vector,
-                        type_=Vector(DBConnector.VECTOR_DIM),
-                    )
-                )
-            ).limit(limit)
-        else:
-            query = query.order_by(*order_by_clause).limit(limit)
+        query = query.order_by(*order_by_clause).limit(limit)
 
         with engine.connect() as connection:
             result = connection.execute(query)
