@@ -1,23 +1,23 @@
-DOCKER_COMPOSE = docker compose
-UID := $(shell id -u)
-GID := $(shell id -g)
+set-id:
+	@echo "UID=$(shell id -u)" > .env.local
+	@echo "GID=$(shell id -g)" >> .env.local
 
 
 all: run
 
 
-build:
+build: set-id
 	@echo "Building Docker image..."
 	mkdir -p ~/archives_collection_images/
-	UID=$(UID) GID=$(GID) $(DOCKER_COMPOSE) build
+	docker compose build
 
 run:
 	@echo "Running the service..."
-	UID=$(UID) GID=$(GID) $(DOCKER_COMPOSE) up -d
+	docker compose up -d
 
 stop:
 	@echo "Stopping the service..."
-	UID=$(UID) GID=$(GID) $(DOCKER_COMPOSE) down
+	docker compose down
 
 clean:
 	@echo "Cleaning up Docker resources..."
@@ -27,11 +27,10 @@ clean:
 
 jupyter:
 	@echo "Run a jupyter notebook. Connect to localhost:8888 from your editor..."
-	docker exec -it webapp_container bash -c 'export HOME=/tmp && jupyter notebook --ip=0.0.0.0 --port=8888 --allow-root --IdentityProvider.token=""'
-
+	docker exec -it webapp_container bash -c 'export HOME=/tmp && jupyter notebook --ip=0.0.0.0 --port=8888 --allow-root --IdentityProvider.token="" 2>&1'
 logs:
-	@echo "Showing data collection logs..."
-	docker exec -it celery_worker tail -f /tmp/logs.log
+	@echo "Showing all containers logs..."
+	docker compose logs -f
 
 help:
 	@echo "Available commands:"
@@ -40,5 +39,5 @@ help:
 	@echo "  make stop                - Stop the service"
 	@echo "  make clean               - Clean up Docker resources"
 	@echo "  make jupyter             - Run a jupyter notebook"
-	@echo "  make logs                - Show data collection logs"
+	@echo "  make logs                - Show containers logs"
 	@echo "  make help                - Show this help message"

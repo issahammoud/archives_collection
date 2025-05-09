@@ -8,9 +8,8 @@ import requests
 import itertools
 import numpy as np
 from functools import wraps
-from sqlalchemy import inspect
-from spellchecker import SpellChecker
 from wand.image import Image as WandImage
+from sqlalchemy import inspect, MetaData, Table, text, Select
 
 from src.helpers.enum import DBCOLUMNS
 
@@ -93,24 +92,58 @@ def convert_count_to_str(count):
     return count
 
 
-def has_table_decorator(func):
+def execute(func):
     @wraps(func)
-    def wrapper(*args, **kwargs):
-        engine = engine = kwargs.get("engine", args[0])
-        table = kwargs.get("table", args[1])
-
-        if not engine or not table:
-            raise ValueError(
-                "Both 'engine' and 'table_name' must be provided as arguments."
-            )
+    def wrapper(engine, table, *args, **kwargs):
+        ef_search = os.getenv("HNSW_EF_SEARCH", 1000)
 
         inspector = inspect(engine)
         if table not in inspector.get_table_names():
             return None
 
-        return func(*args, **kwargs)
+        metadata = MetaData()
+        table_ref = Table(table, metadata, autoload_with=engine)
+
+        with engine.connect() as connection:
+            with connection.begin() as transaction:
+                connection.execute(
+                    text("SET LOCAL hnsw.ef_search = :ef_val"), {"ef_val": ef_search}
+                )
+                query = func(table_ref, *args, **kwargs)
+                logger.debug(
+                    f"{func.__name__}: "
+                    + str(
+                        query.compile(
+                            engine,
+                            compile_kwargs={"literal_binds": True},
+                        )
+                    )
+                )
+                result = connection.execute(query)
+                if result.returns_rows:
+                    rows = result.fetchall()
+                    rows = clean_fetched_values(rows)
+                    return rows
+                else:
+                    return result.rowcount
 
     return wrapper
+
+
+def clean_fetched_values(results):
+    if results:
+        array = np.array(results)
+        assert (
+            len(array.shape) == 2
+        ), f"There are {len(array.shape)} dimensions in the result"
+        if array.shape[0] == 1 and array.shape[1] == 1:
+            return array[0][0]
+        if array.shape[0] > 1 and array.shape[1] == 1:
+            return array.flatten().tolist()
+
+        return array.tolist()
+
+    return results
 
 
 def is_image_url(url):

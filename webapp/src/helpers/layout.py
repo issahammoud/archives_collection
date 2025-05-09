@@ -126,9 +126,11 @@ class Navbar:
 
     @staticmethod
     def filter_by_date():
-        min_max_dates = DBConnector.get_min_max_dates(engine, DBConnector.TABLE)
+        min_max_dates = DBConnector.get_min_max_dates(engine, DBConnector.TABLE)[0]
         min_max_dates = (
-            min_max_dates if min_max_dates else [datetime.now(), datetime.now()]
+            min_max_dates
+            if min_max_dates is not None
+            else [datetime.now(), datetime.now()]
         )
         date = dmc.DatePickerInput(
             id="date",
@@ -146,7 +148,7 @@ class Navbar:
     @staticmethod
     def filter_by_tag():
         tags = DBConnector.get_tags(engine, DBConnector.TABLE)
-        tags = tags if tags else []
+        tags = tags if tags is not None else []
         tags = [tag.title() for tag in tags if tag and not tag.isnumeric()]
         select = dmc.Select(
             id="tag",
@@ -309,7 +311,7 @@ class Navbar:
         total_count = (
             total_count
             if total_count
-            else DBConnector.get_total_count(engine, DBConnector.TABLE) or 0
+            else DBConnector.get_total_count(engine, DBConnector.TABLE)
         )
         date = Navbar.filter_by_date()
         tag = Navbar.filter_by_tag()
@@ -393,7 +395,7 @@ class Main:
         return dmc.Box(stats_bar, id="stats_bar")
 
     @staticmethod
-    def get_card(rowid, img_path, title, content, tag, archive, date, link):
+    def get_card(rowid, img_path, title, content, tag, archive, date, link, *args):
         img_height = 200
         if img_path:
             src = resize_image_for_html(img_path, target_height=img_height)

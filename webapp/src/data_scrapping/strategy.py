@@ -1,4 +1,3 @@
-import os
 import time
 import cloudscraper
 from abc import ABC, abstractmethod
@@ -9,13 +8,13 @@ from src.utils.logging import logging
 logger = logging.getLogger(__name__)
 
 
-class ContentFetchStrategy(ABC):
+class FetchStrategy(ABC):
     @abstractmethod
     def get_url_content(self, url):
         pass
 
 
-class RequestsFetchStrategy(ContentFetchStrategy):
+class RequestsFetchStrategy(FetchStrategy):
     def __init__(self):
         self._start_time = time.time()
         self._init_scraper()

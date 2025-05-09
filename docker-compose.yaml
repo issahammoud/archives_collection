@@ -6,6 +6,7 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env
+      - .env.local
     environment:
       - REDIS_URL=redis://redis:6379/0
       - EMBED_URL=http://embedding:8000/v1/embeddings
@@ -36,13 +37,15 @@ services:
     cpu_quota: 1000000
 
   db:
-    image: pgvector/pgvector:pg14
+    image: pgvector/pgvector:pg17
     container_name: postgres_container
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    shm_size: '2gb'
+      HNSW_EF_SEARCH: ${HNSW_EF_SEARCH}
+    command: postgres -c work_mem=256MB -c shared_buffers=2GB
+    shm_size: '6gb'
     ulimits:
       nofile:
         soft: 65535

@@ -1,49 +1,31 @@
 # Archives Collection
 
-Archives Collection is a Python-based project designed to collect and visualize data from news archives websites. The system is built with a robust, modular architecture that leverages multiple design patterns to ensure scalability and maintainability. It has been proven at scale by successfully collecting millions of data points, opening the door to many AI and advanced analytics applications.
+Archives Collection is a Python-based project designed to collect, visualize and filter data from news archives websites. The system is built with a robust, modular architecture that leverages multiple design patterns to ensure scalability and maintainability. It has been proven at scale by successfully collecting millions of data points, opening the door to many AI and advanced analytics applications.
 
 > **Important:**
 > The collected data is subject to copyright laws. This project is intended for educational and research purposes only. You must ensure that your use of any data complies with all applicable copyright regulations. The author does not encourage any breach of copyright.
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Features](#features)
-- [Architecture](#architecture)
 - [Technologies](#technologies)
 - [Installation](#installation)
-- [Usage](#usage)
 - [Modules](#modules)
   - [Data Collection](#data-collection)
-  - [Visualization](#visualization)
+  - [Frontend](#frontend)
   - [Backend](#backend)
   - [Database](#database)
-- [Future Work](#future-work)
-- [License](#license)
-
-## Overview
-
-Archives Collection automates the process of collecting and visualizing news archives data. By combining web scraping, asynchronous processing, and interactive dashboards, this project provides a platform that not only aggregates a large volume of data but also enables efficient analysis and search.
-
-## Features
-
-- **Automated Data Collection:** Uses Cloudscaper and Selenium with a clean, modular architecture.
-- **Modular Design:** Implements multiple design patterns (Decorator, Registry, Strategy, Factory) for flexibility and scalability.
-- **Collector Aggregator:** Integrates 16 distinct collectors into a unified aggregation system.
-- **Interactive Visualization:** Built with Dash and Dash Mantine Components for a modern, responsive user interface.
-- **Asynchronous Processing:** Leverages Dash callbacks and Celery (with Redis) to manage long-running tasks.
-- **Advanced Search:** Uses PostgreSQL with SQLAlchemy and tsvector for efficient full-text search.
-- **Containerized Deployment:** Managed via Makefile, Docker, and Docker Compose for easy build, run, stop, and cleanup operations.
 
 
 ## Technologies
 
 - **Programming Language:** Python
-- **Data Collection:** Selenium, Cloudscaper
+- **Data Collection:** Cloudscaper, Beautiful Soup
 - **Containerization:** Docker, Docker Compose, Makefile (for container management)
-- **Web Framework:** Dash, Dash Mantine Components
-- **Asynchronous Processing:** Celery with Redis as the message broker
-- **Database:** PostgreSQL, SQLAlchemy, tsvector
+- **Front End:** Dash, Dash Mantine Components
+- **Back End:** Dash, Celery, Redis
+- **Database:** PostgreSQL with SQLAlchemy
+- **Search Engine:**: tsvector for text search, pgvector for semantic search
+- **Embedding Model**: Jina v3 for textual multilingue embeddings.
 
 ## Installation
 
@@ -53,6 +35,8 @@ Before running this project, make sure you have Docker and Docker Compose instal
 sudo apt update && sudo apt install -y make python3 python3-pip postgresql-client
 ```
 
+Additionally, the `embedding_container` requires an NVIDIA GPU to run. I tested it with 8GB of GPU memory and batch prediction; if you have less memory, you may need to reduce the batch size.
+
 1. **Clone the Repository:**
 
    ```bash
@@ -61,26 +45,25 @@ sudo apt update && sudo apt install -y make python3 python3-pip postgresql-clien
 
 2. **Configure Environment Variables**
 
-    Create or update a `.env` file with your database credentials and other configuration settings. It should include the following variables:
+    Copy the sample file and fill in your own settings:
+
+    ```bash
+    cp .env.template .env
     ```
-    POSTGRES_USER=
-    POSTGRES_PASSWORD=
-    POSTGRES_DB=
-    ```
-    Those variables will be automatically used the first time to create and set the database and the user.
+    Then open .env and enter your database credentials and any other required configuration values.
+
+    On first startup, these settings will be used to automatically create and configure your database and its user. The `HNSW_EF_SEARCH` value controls the HNSW algorithm's search parameter; higher numbers improve recall but increase query time.
 
 3. **Build and Run Containers:**
+
+    Run the following to build and start the app:
 
     ```bash
     make build
     make
     ```
 
-    Or use Docker Compose directly:
-
-    ```bash
-    docker compose up --build
-    ```
+    After the initial build completes—which can take some time (it must install CUDA/Torch dependencies and download the Jina v3 weights)—you only need to use make to start the service. Then open your browser to [http://localhost:8050](http://localhost:8050) to access the interface.
 
 4. **Stopping and Cleaning Up:**
 
@@ -90,81 +73,89 @@ sudo apt update && sudo apt install -y make python3 python3-pip postgresql-clien
     make stop
     ```
 
-    To remove containers and volumes:
+    To remove containers and images (this will not remove the mounted database):
 
     ```bash
     make clean
     ```
+5. **Other useful commands:**
+    To run a jupyter notebook:
 
-## Usage
+    ```bash
+    make jupyter
+    ```
+    To show the containers logs:
 
-- **Data Collection:**
-  The data collection process is automated via Cloudscaper and Selenium. The collectors are aggregated into a single system that processes multiple sources concurrently.
-
-- **Visualization:**
-  Once the data is collected, access the interactive dashboard at [http://localhost:8050](http://localhost:8050) to explore visualizations and start collecting data.
-
-- **Background Processing:**
-  Long-running tasks (e.g., data collection) are handled asynchronously using Celery with Redis.
-
-- **Search:**
-  Utilize the PostgreSQL-backed full-text search powered by SQLAlchemy and tsvector to quickly query large datasets.
+    ```bash
+    make logs
+    ```
 
 ## Modules
 
-### Data Collection
+### Data Collection (src/data_scrapping)
 
 - **Scraping Engine:**
-  Uses Selenium and Cloudscaper to fetch data from news archives.
+  Uses Cloudscaper to fetch data from news archives.
 
 - **Design Patterns:**
   Implements Decorator, Registry, Strategy, and Factory patterns for a clean, scalable codebase.
 
 - **Collectors:**
-  16 individual collectors can be aggregated for comprehensive data collection.
+  10 individual collectors can be aggregated for comprehensive data collection.
 
-### Visualization
+### FrontEnd (src/helpers/layout)
 
-- **Dash Dashboard:**
-  An interactive front end built with Dash and enhanced with Dash Mantine Components for a modern user interface.
+- **Carousel**: A carousel showing the collected articles with scrolling capabilities.
 
-- **Real-Time Updates:**
-  Dynamic dashboards that update as new data is collected.
+- **Navbar**: A navbar containing the control button for filtering and sorting:
+  - start collection/stop collection
+  - change order: to inverse the date order (ascending/descending)
+  - filter image: show/remove articles with empty images (placeholders)
+  - group by: show the date grouped per day/month/year
+  - Filter by date/topic/text/archive.
+
+
+- **Histogram**: A plotly graph showing the frequency of articles per day/month/year.
 
 ### Backend
 
 - **Dash Callbacks:**
-  Orchestrate interactions between the front end and backend processes.
+  Orchestrate interactions between the front end and backend processes (code in src/utils/callbacks).
 
 - **Celery & Redis:**
-  Manage long-running tasks asynchronously.
+  Manage data collection task asynchronously (code in src/utils/celery_tasks).
 
-### Database
-
-- **PostgreSQL:**
-  Stores the collected data.
-
-- **SQLAlchemy:**
-  Serves as the ORM for database interactions.
-
-- **TSVECTOR:**
-  Enables efficient full-text search capabilities.
-
-## Future Work
-
-- **AI and Advanced Analytics:**
-  Dedicated modules for applying AI techniques and advanced analytics to the collected data.
-
-- **Enhanced Visualizations:**
-  Additional dashboard components and interactive features to further improve data exploration.
-
-- **Scalability Enhancements:**
-  Further optimizations in the data collection and aggregation pipelines to handle even larger datasets.
+### Database: (src/helpers/db_connector)
+  - Use Postgres and pgvector extension as a vector db.
+  - Fetch data for scrolling using keyset pagination.
+  - Apply filters dynamically to sync with the interface.
 
 
-## License
+**Table:** `articles`
 
-This project is licensed under the [MIT License](LICENSE).
+| Column            | Type                              | Constraints / Generation                                                                                                       |
+|-------------------|-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
+| `rowid`           | `BIGINT`                          | Primary Key, auto-increment                                                                                                    |
+| `date`            | `DATE`                            | Not Null                                                                                                                       |
+| `archive`         | `VARCHAR`                         | Not Null                                                                                                                       |
+| `image`           | `TEXT`                            | Nullable                                                                                                                       |
+| `title`           | `VARCHAR`                         | Nullable                                                                                                                       |
+| `content`         | `VARCHAR`                         | Nullable                                                                                                                       |
+| `tag`             | `VARCHAR`                         | Nullable                                                                                                                       |
+| `link`            | `VARCHAR`                         | Not Null                                                                                                                       |
+| `hash`            | `BIGINT`                          | Computed as `hashtext(link)::BIGINT`, persisted; Not Null; Unique                                                              |
+| `embedding`       | `HALFVEC(1024)`           | Not Null; stores vector embeddings in HALFVEC format                                                                           |
+| `text_searchable` | `TSVECTOR`                        | Generated as `to_tsvector('french', coalesce(title, '') || ' ' || coalesce(content, ''))`, stored; GIN-indexed for full-text |
+
+
+**Indexes**
+
+| Name                    | Columns            | Type   | Options                 |
+|-------------------------|--------------------|--------|-------------------------|
+| `date_rowid_index`      | `date, rowid`      | B-Tree |                         |
+| `text_searchable_index` | `text_searchable`  | GIN    |                         |
+| `embedding_index`       | `embedding`        | HNSW   | `m=32, ef_construction=128` |
+
 
 ---
 

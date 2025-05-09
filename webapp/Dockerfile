@@ -20,4 +20,3 @@ ENV PYTHONPATH=/webapp
 EXPOSE 8050
 
 CMD gunicorn -w 4 -b 0.0.0.0:8050 src.main.app:server
-# CMD ["python3", "src/main/app.py"]

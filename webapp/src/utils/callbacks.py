@@ -1,10 +1,11 @@
 import os
 import dash
 import logging
+import tempfile
 import pandas as pd
 from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import Input, State, Output, callback, dcc
-from src.helpers.enum import DBCOLUMNS
+from src.helpers.enum import DBCOLUMNS, OPERATORS
 from src.helpers.db_connector import DBConnector
 from src.helpers.layout import Layout, Navbar, Main
 from src.utils.utils import get_query_embedding
@@ -16,32 +17,23 @@ engine = DBConnector.get_engine()
 
 
 def get_filters_dict(archive, tag, date_range, submit, null_clicks, query):
-    filters = {DBCOLUMNS.date: [("ge", date_range[0])]} if date_range[0] else {}
+    filters = {DBCOLUMNS.date: [(OPERATORS.ge, date_range[0])]} if date_range[0] else {}
     if date_range[1]:
-        filters[DBCOLUMNS.date].append(("le", date_range[1]))
+        filters[DBCOLUMNS.date].append((OPERATORS.le, date_range[1]))
 
-    filters.update({DBCOLUMNS.tag: [("like", tag.strip())]} if tag else {})
+    filters.update({DBCOLUMNS.tag: [(OPERATORS.like, tag.strip())]} if tag else {})
 
-    filters.update({DBCOLUMNS.archive: [("in", archive)]} if archive else {})
+    filters.update({DBCOLUMNS.archive: [(OPERATORS.in_, archive)]} if archive else {})
 
     if submit and query:
         if len(query.split()) == 1:
-
-            filters.update({DBCOLUMNS.text_searchable: [("text_search", query)]})
+            filters.update({DBCOLUMNS.text_searchable: [(OPERATORS.ts, query)]})
         else:
-            filters.update(
-                {
-                    DBCOLUMNS.embedding: [
-                        (
-                            "similarity",
-                            get_query_embedding(query, os.getenv("EMBED_URL")),
-                        )
-                    ]
-                }
-            )
+            embedding = get_query_embedding(query, os.getenv("EMBED_URL"))
+            filters.update({DBCOLUMNS.embedding: [(OPERATORS.vs, embedding)]})
 
     filters.update(
-        {DBCOLUMNS.image: [("notnull", None)]}
+        {DBCOLUMNS.image: [(OPERATORS.notnull, None)]}
         if null_clicks is not None and null_clicks % 2
         else {}
     )
@@ -98,15 +90,16 @@ def create_content(
         ],
         desc_order=order,
     )
-
     args = args if args else []
     total_count = DBConnector.get_total_count(engine, DBConnector.TABLE, filters)
     total_count = total_count if total_count else 0
 
     badge = Navbar.get_badge(total_count)
     if len(args) > Layout.SLIDES:
+
         df = pd.DataFrame(
-            DBConnector.group_by(engine, DBConnector.TABLE, groupby, filters)
+            DBConnector.group_by(engine, DBConnector.TABLE, groupby, filters),
+            columns=["date", "count"],
         )
         last_seen = {
             "forward": {
@@ -172,6 +165,8 @@ def update_carousel(active, previous_active, last_seen, states):
                 desc_order=order,
             )
             if len(args) > Layout.SLIDES:
+                args = args if direction == "forward" else args[::-1]
+
                 last_seen["forward"] = {
                     DBCOLUMNS.date: args[-1 - Layout.SLIDES][-2],
                     DBCOLUMNS.rowid: args[-1 - Layout.SLIDES][0],
@@ -230,7 +225,8 @@ def group_by(value, states):
         filters = get_filters_dict(archive, tag, date_range, True, null_clicks, query)
 
         df = pd.DataFrame(
-            DBConnector.group_by(engine, DBConnector.TABLE, value, filters)
+            DBConnector.group_by(engine, DBConnector.TABLE, value, filters),
+            columns=["date", "count"],
         )
         return Main.get_stats(df, not order), False
     raise PreventUpdate
@@ -251,7 +247,15 @@ def download(n_clicks, states):
         null_clicks = states["null_clicks"]
 
         filters = get_filters_dict(archive, tag, date_range, True, null_clicks, query)
-        columns = [col for col in list(DBCOLUMNS) if "text_searchable" not in col]
+        columns = [
+            DBCOLUMNS.date,
+            DBCOLUMNS.archive,
+            DBCOLUMNS.link,
+            DBCOLUMNS.title,
+            DBCOLUMNS.content,
+            DBCOLUMNS.tag,
+            DBCOLUMNS.image,
+        ]
         data = DBConnector.get_all_rows(engine, DBConnector.TABLE, filters, columns)
         df = pd.DataFrame(data, columns=columns)
         return dcc.send_data_frame(df.to_csv, "data.csv")

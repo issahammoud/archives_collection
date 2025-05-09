@@ -13,13 +13,12 @@ app = FastAPI()
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 
 args = EngineArgs(
-    model="jinaai/jina-embeddings-v3",
+    model=model_name,
     task="embedding",
     dtype="bfloat16",
     trust_remote_code=True,
 )
 
-# instantiate the LLM (and engine) in one go
 model = LLM(**vars(args))
 
 
@@ -55,6 +54,11 @@ async def generate_embedding(req: EmbeddingRequest):
     embeddings = [output.outputs.embedding for output in outputs]
 
     return EmbeddingORJSONResponse({"embeddings": embeddings})
+
+
+@app.post("/v1/dummy_embeddings", response_class=EmbeddingORJSONResponse)
+async def generate_embedding(req: EmbeddingRequest):
+    return EmbeddingORJSONResponse({"embeddings": np.random.randn(1024)})
 
 
 @app.get("/health")

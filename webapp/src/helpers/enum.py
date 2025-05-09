@@ -28,6 +28,20 @@ class DBCOLUMNS(str, Enum):
     text_searchable = "text_searchable"
 
 
+class OPERATORS(str, Enum):
+    eq = "eq"
+    gt = "gt"
+    lt = "lt"
+    ge = "ge"
+    le = "le"
+    in_ = "in"
+    like = "like"
+    isnull = "isnull"
+    notnull = "notnull"
+    ts = "text_search"
+    vs = "vector_search"
+
+
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:98.0) Gecko/20100101 Firefox/98.0",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",

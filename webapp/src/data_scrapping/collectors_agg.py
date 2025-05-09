@@ -26,26 +26,11 @@ class CollectorsAggregator:
         ), f"Found {len(self.collectors)} collectors. Should have at least 1."
         self.workers = len(self.collectors)
 
-    def _eliminate_done_dates(self, urls, archive):
-        new_urls = []
-        done_dates = set(
-            DBConnector.get_done_dates(
-                engine,
-                DBConnector.TABLE,
-                filters={DBCOLUMNS.archive: [("eq", archive)]},
-            )
-        )
-        for date, url in urls:
-            if date not in done_dates:
-                new_urls.append((date, url))
-        return new_urls
-
     def get_all_urls(self):
         all_urls = []
 
         for collector in self.collectors:
             urls = collector.get_all_urls()
-            urls = self._eliminate_done_dates(urls, collector.archive)
             all_urls.append(urls)
 
         all_urls = alternate_elements(all_urls)
@@ -66,8 +51,8 @@ class CollectorsAggregator:
         count_before = {}
         for collector in self.collectors:
             name = collector.archive
-            count_before[name] = DBConnector.get_archive_count(
-                engine, DBConnector.TABLE, name
+            count_before[name] = DBConnector.get_total_count(
+                engine, DBConnector.TABLE, filters={DBCOLUMNS.archive: [("eq", name)]}
             )
             logger.info(
                 f"We already collected {count_before[name]} articles for {name} archive."
@@ -85,7 +70,9 @@ class CollectorsAggregator:
 
         for collector in self.collectors:
             name = collector.archive
-            rows_nb = DBConnector.get_archive_count(engine, DBConnector.TABLE, name)
+            rows_nb = DBConnector.get_total_count(
+                engine, DBConnector.TABLE, filters={DBCOLUMNS.archive: [("eq", name)]}
+            )
             diff = rows_nb - count_before[name]
             logger.info(
                 f"\nFor {name}:\n"

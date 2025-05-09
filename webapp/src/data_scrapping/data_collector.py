@@ -121,7 +121,8 @@ class DataCollector(ABC):
             data[DBCOLUMNS.embedding] = emb
             list_.append(data)
 
-        DBConnector.insert_row(self.engine, DBConnector.TABLE, list_)
+        rowscount = DBConnector.insert_row(self.engine, DBConnector.TABLE, list_)
+        logger.info(f"{rowscount} were inserted into the database")
 
     @abstractmethod
     def get_section_url(self, section):

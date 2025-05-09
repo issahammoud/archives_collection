@@ -56,6 +56,7 @@ onnx/
 *.png
 !logo.png
 *env/
-.env
+.env*
+!.env.template
 
 *csv
