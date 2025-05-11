@@ -39,6 +39,6 @@ For parallel execution, the `CollectorsAggregator` class instantiates and runs a
 
 ## Class Diagram
 
-You can see here the relationship between each class in the following class diagram. The entrypoint to the code is the `CollectorsAggregator` class. It is called in `celery` (src/utils/celery_tasks.py):
+The relationships between the main classes are illustrated in the class diagram below. The entry point to the data collection system is the `CollectorsAggregator` class, which is invoked from a Celery task defined in `src/utils/celery_tasks.py`
 
 ![Data Collection Class Diagram](/webapp/assets/data_collection_diagram.png)

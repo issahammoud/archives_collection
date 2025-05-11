@@ -4,9 +4,11 @@ services:
     build:
       context: webapp/
       dockerfile: Dockerfile
+      args:
+        HOST_UID: "${UID}"
+        HOST_GID: "${GID}"
     env_file:
       - .env
-      - .env.local
     environment:
       - REDIS_URL=redis://redis:6379/0
       - EMBED_URL=http://embedding:8000/v1/embeddings
@@ -17,7 +19,7 @@ services:
         condition: service_started
       embedding:
         condition: service_healthy
-    user: "${UID}:${GID}"
+
     volumes:
       - ./webapp/:/webapp
       - ~/archives_collection_images:/images
@@ -58,6 +60,7 @@ services:
 
   redis:
     image: redis:7.4.2
+    container_name: redis_container
     ports:
       - "6379:6379"
 
@@ -67,7 +70,13 @@ services:
       context: embedding/
       dockerfile: Dockerfile
       args:
+        BASE_IMAGE: ${BASE_IMAGE}
+        EMBEDDING_MODE: ${EMBEDDING_MODE}
         torch_cuda_arch_list: ""
+    env_file:
+      - .env.local
+    ports:
+      - "8000:8000"
     deploy:
       resources:
         reservations:
@@ -75,8 +84,6 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-    ports:
-      - "8000:8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s

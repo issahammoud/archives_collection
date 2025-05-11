@@ -162,6 +162,8 @@ def get_embeddings(batch, embedding_url, timeout=20):
         resp.raise_for_status()
         data = orjson.loads(resp.content)
         embeddings = np.array(data["embeddings"])
+        if np.any(embeddings == None):
+            return None
         return embeddings
 
     except Exception as e:
@@ -188,6 +190,8 @@ def get_query_embedding(query, embedding_url, timeout=20):
         resp.raise_for_status()
         data = orjson.loads(resp.content)
         embeddings = np.array(data["embeddings"])
+        if np.any(embeddings == None):
+            return None
         return embeddings.ravel().tolist()
 
     except Exception as e:

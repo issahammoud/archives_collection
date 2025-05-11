@@ -30,7 +30,17 @@ def get_filters_dict(archive, tag, date_range, submit, null_clicks, query):
             filters.update({DBCOLUMNS.text_searchable: [(OPERATORS.ts, query)]})
         else:
             embedding = get_query_embedding(query, os.getenv("EMBED_URL"))
-            filters.update({DBCOLUMNS.embedding: [(OPERATORS.vs, embedding)]})
+            if embedding:
+                filters.update({DBCOLUMNS.embedding: [(OPERATORS.vs, embedding)]})
+            else:
+                logger.debug("Falling back to tsvector search")
+                filters.update(
+                    {
+                        DBCOLUMNS.text_searchable: [
+                            (OPERATORS.ts, " & ".join(query.split()))
+                        ]
+                    }
+                )
 
     filters.update(
         {DBCOLUMNS.image: [(OPERATORS.notnull, None)]}
@@ -189,6 +199,8 @@ def update_carousel(active, previous_active, last_seen, states):
 @callback(
     Output("drawer", "opened"),
     Output("open_drawer", "style"),
+    Output("navbar_col", "span"),
+    Output("main", "span"),
     Input("open_drawer", "n_clicks"),
     State("drawer", "opened"),
     State("open_drawer", "style"),
@@ -202,7 +214,9 @@ def open_close_drawer(n_clicks, opened, style):
                 {"left": "calc(15% - 15px)", "transform": "rotate(180deg)"}
             )
         )
-        return not opened, style
+        navbar_span = 2 if not opened else 0
+        main_span = 12 - navbar_span
+        return not opened, style, navbar_span, main_span
     raise PreventUpdate
 
 
@@ -321,3 +335,24 @@ def refresh(n, job_status):
             return True, False, True
         return False, True, False
     raise PreventUpdate
+
+
+@callback(
+    Output("interval", "disabled", allow_duplicate=True),
+    Output("start_collect", "disabled", allow_duplicate=True),
+    Output("stop_collect", "disabled", allow_duplicate=True),
+    Input("job_status", "data"),
+    prevent_initial_call=False,
+)
+def sync_controls_on_load(job_status):
+    if not job_status or "task_id" not in job_status:
+        return True, False, True
+
+    task_id = job_status["task_id"]
+    desired = job_status.get("status", "")
+    async_result = collection_task.AsyncResult(task_id)
+
+    if desired == "stop" or async_result.state in ("REVOKED", "SUCCESS", "FAILURE"):
+        return True, False, True
+
+    return False, True, False

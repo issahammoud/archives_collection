@@ -86,12 +86,13 @@ class RemoveDoneDates(Decorator):
             DBCOLUMNS.archive: [("eq", self._collector.archive)],
             DBCOLUMNS.date: [("ge", date_range[0]), ("le", date_range[1])],
         }
-        self._done_dates = DBConnector.get_done_dates(
+        done_dates = DBConnector.get_done_dates(
             engine,
             DBConnector.TABLE,
             filters=self._filters,
         )
-
+        done_dates = done_dates if done_dates is not None else []
+        self._done_dates = done_dates if isinstance(done_dates, list) else [done_dates]
         self._done_urls = None
 
     def get_all_urls(self):
@@ -103,14 +104,14 @@ class RemoveDoneDates(Decorator):
 
     def _lazy_load_urls(self):
         if self._done_urls is None:
-            self._done_urls = set(
-                DBConnector.get_all_rows(
-                    engine,
-                    DBConnector.TABLE,
-                    filters=self._filters,
-                    columns=[DBCOLUMNS.link],
-                )
+            done_urls = DBConnector.get_all_rows(
+                engine,
+                DBConnector.TABLE,
+                filters=self._filters,
+                columns=[DBCOLUMNS.link],
             )
+            self._done_urls = set(done_urls) if done_urls else set()
+            logger.info(f"{self._collector.archive}: {len(self._done_urls)}")
 
     def get_section_url(self, section):
         self._lazy_load_urls()

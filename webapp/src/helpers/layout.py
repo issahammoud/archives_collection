@@ -13,6 +13,7 @@ engine = DBConnector.get_engine()
 
 
 class Graph:
+    @staticmethod
     def get_graph(df, order):
         value = df.columns[0]
         layout = go.Layout(
@@ -126,9 +127,9 @@ class Navbar:
 
     @staticmethod
     def filter_by_date():
-        min_max_dates = DBConnector.get_min_max_dates(engine, DBConnector.TABLE)[0]
+        min_max_dates = DBConnector.get_min_max_dates(engine, DBConnector.TABLE)
         min_max_dates = (
-            min_max_dates
+            min_max_dates[0]
             if min_max_dates is not None
             else [datetime.now(), datetime.now()]
         )
@@ -308,11 +309,11 @@ class Navbar:
 
     @staticmethod
     def get_navbar(total_count=None):
-        total_count = (
-            total_count
-            if total_count
-            else DBConnector.get_total_count(engine, DBConnector.TABLE)
+        total_count = total_count or DBConnector.get_total_count(
+            engine, DBConnector.TABLE
         )
+        total_count = total_count if total_count else 0
+
         date = Navbar.filter_by_date()
         tag = Navbar.filter_by_tag()
         text = Navbar.filter_by_text()
@@ -361,7 +362,7 @@ class Navbar:
                     lockScroll=False,
                     size="15%",
                     shadow="sm",
-                    keepMounted=True,
+                    keepMounted=False,
                     radius="sm",
                     offset="100px 0",
                 ),
@@ -593,7 +594,7 @@ class Layout:
                     data={DBCOLUMNS.rowid: "", DBCOLUMNS.date: None, "direction": None},
                 ),
                 dcc.Store(id="states", data={}),
-                dcc.Store(id="job_status", data={}),
+                dcc.Store(id="job_status", data={}, storage_type="session"),
                 dcc.Download(id="download_csv"),
                 dcc.Interval(
                     id="interval", interval=5000, n_intervals=0, disabled=True
@@ -609,7 +610,7 @@ class Layout:
                     dmc.Container(
                         dmc.Grid(
                             [
-                                dmc.GridCol(navbar, span=2),
+                                dmc.GridCol(navbar, span=2, id="navbar_col"),
                                 dmc.GridCol(id="main", span=10),
                             ]
                         ),

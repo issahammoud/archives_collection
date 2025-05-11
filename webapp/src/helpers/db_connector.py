@@ -120,16 +120,14 @@ class DBConnector:
                 Column(
                     DBCOLUMNS.embedding.value,
                     HALFVEC(DBConnector.VECTOR_DIM),
-                    nullable=False,
+                    nullable=True,
+                ),
+                Index(
+                    f"{DBConnector.TABLE}_date_rowid_index",
+                    Column(DBCOLUMNS.date.value),
+                    Column(DBCOLUMNS.rowid.value),
                 ),
             )
-
-            index = Index(
-                "date_rowid_index",
-                table_ref.c[DBCOLUMNS.date],
-                table_ref.c[DBCOLUMNS.rowid],
-            )
-            index.create(bind=engine)
 
             metadata.create_all(engine)
 
@@ -148,7 +146,7 @@ class DBConnector:
 
     @staticmethod
     def add_searchable_column(engine, table, column_name):
-        with engine.execute() as connection:
+        with engine.connect() as connection:
             connection.execute(
                 text(
                     f"ALTER TABLE {table} ADD COLUMN {column_name} tsvector "
@@ -159,7 +157,7 @@ class DBConnector:
             )
             connection.execute(
                 text(
-                    f"CREATE INDEX {column_name}_index ON {table} "
+                    f"CREATE INDEX {DBConnector.TABLE}_{column_name}_index ON {table} "
                     f"USING GIN ({column_name})"
                 )
             )
@@ -167,12 +165,13 @@ class DBConnector:
 
     @staticmethod
     def add_vector_index(engine, table, column_name):
-        with engine.execute() as connection:
+        with engine.connect() as connection:
             connection.execute(
                 text(
-                    f"CREATE INDEX {column_name}_index ON {table} "
+                    f"CREATE INDEX {DBConnector.TABLE}_{column_name}_index ON {table} "
                     f"USING hnsw ({column_name} halfvec_ip_ops) "
-                    "WITH (m = 32, ef_construction = 128);"
+                    "WITH (m = 32, ef_construction = 128) "
+                    f"WHERE {column_name} IS NOT NULL;"
                 )
             )
             connection.commit()
@@ -191,10 +190,13 @@ class DBConnector:
             ops = filters.pop(sim_key)
             for op, vec in ops:
                 if op == OPERATORS.vs:
-                    sim_expr = DBConnector.operator_map[op](base.c.embedding, vec)
+                    sim_expr = DBConnector.operator_map[op](base.c[sim_key], vec)
+                    notnull = DBConnector.operator_map[OPERATORS.notnull](
+                        base.c[sim_key], None
+                    )
                     subq = (
                         select(*base.c, sim_expr.label("similarity"))
-                        .where(sim_expr < literal(DBConnector.THRESHOLD))
+                        .where(and_(sim_expr < literal(DBConnector.THRESHOLD)), notnull)
                         .order_by(sim_expr)
                         .limit(DBConnector.TOP_K)
                         .subquery("hnsw_candidates")

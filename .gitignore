@@ -55,6 +55,7 @@ onnx/
 *.ipynb
 *.png
 !logo.png
+!data_collection_diagram.png
 *env/
 .env*
 !.env.template

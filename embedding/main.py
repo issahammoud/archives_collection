@@ -1,64 +1,33 @@
 import orjson
-import numpy as np
-from vllm import LLM, EngineArgs
 from typing import List, Any
 from pydantic import BaseModel
-from fastapi import FastAPI, Response
-from transformers import AutoTokenizer
+from fastapi import FastAPI, HTTPException, Response
 
-model_name = "jinaai/jina-embeddings-v3"
+from providers import get_provider
+
 
 app = FastAPI()
-
-tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-
-args = EngineArgs(
-    model=model_name,
-    task="embedding",
-    dtype="bfloat16",
-    trust_remote_code=True,
-)
-
-model = LLM(**vars(args))
+provider = get_provider()
 
 
-class EmbeddingRequest(BaseModel):
+class EmbedRequest(BaseModel):
     data: List[str]
 
 
-class EmbeddingORJSONResponse(Response):
+class ORJSONResponse(Response):
     media_type = "application/json"
 
     def render(self, content: Any) -> bytes:
         return orjson.dumps(content, option=orjson.OPT_SERIALIZE_NUMPY)
 
 
-def truncate_text(text, max_tokens=8192):
-    encoded = tokenizer(
-        text, truncation=True, max_length=max_tokens, return_tensors=None
-    )
-    ids = encoded["input_ids"]
-    return tokenizer.decode(ids, skip_special_tokens=True)
-
-
-def truncate_req(req, max_tokens=8192):
-    new_req = []
-    for text in req:
-        new_req.append(truncate_text(text, max_tokens))
-    return new_req
-
-
-@app.post("/v1/embeddings", response_class=EmbeddingORJSONResponse)
-async def generate_embedding(req: EmbeddingRequest):
-    outputs = model.embed(truncate_req(req.data))
-    embeddings = [output.outputs.embedding for output in outputs]
-
-    return EmbeddingORJSONResponse({"embeddings": embeddings})
-
-
-@app.post("/v1/dummy_embeddings", response_class=EmbeddingORJSONResponse)
-async def generate_embedding(req: EmbeddingRequest):
-    return EmbeddingORJSONResponse({"embeddings": np.random.randn(1024)})
+@app.post("/v1/embeddings", response_class=ORJSONResponse)
+async def embed(req: EmbedRequest):
+    try:
+        embs = await provider.embed(req.data)
+        return {"embeddings": embs}
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 @app.get("/health")

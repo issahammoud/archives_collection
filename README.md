@@ -35,7 +35,10 @@ Before running this project, make sure you have Docker and Docker Compose instal
 sudo apt update && sudo apt install -y make python3 python3-pip postgresql-client
 ```
 
-Additionally, the `embedding_container` requires an NVIDIA GPU to run. I tested it with 8GB of GPU memory and batch prediction; if you have less memory, you may need to reduce the batch size.
+Moreover, to use the provided embedding service, you’ll need an NVIDIA GPU. If no GPU is detected, the embedding column will remain `None` by default. The setup process will attempt to detect your system configuration and install the appropriate versions automatically, but you can override these settings in the next step if needed.
+
+> Note: Building the embedding service may take a considerable amount of time, as it involves installing vLLM, CUDA, PyTorch, and downloading Jina model weights.
+
 
 1. **Clone the Repository:**
 
@@ -50,7 +53,7 @@ Additionally, the `embedding_container` requires an NVIDIA GPU to run. I tested 
     ```bash
     cp .env.template .env
     ```
-    Then open .env and enter your database credentials and any other required configuration values.
+    Then open `.env` and enter your database credentials and any other required configuration values.
 
     On first startup, these settings will be used to automatically create and configure your database and its user. The `HNSW_EF_SEARCH` value controls the HNSW algorithm's search parameter; higher numbers improve recall but increase query time.
 
@@ -59,11 +62,13 @@ Additionally, the `embedding_container` requires an NVIDIA GPU to run. I tested 
     Run the following to build and start the app:
 
     ```bash
-    make build
+    make build [EMBEDDING_MODE=<GPU|NONE>]
     make
     ```
 
-    After the initial build completes—which can take some time (it must install CUDA/Torch dependencies and download the Jina v3 weights)—you only need to use make to start the service. Then open your browser to [http://localhost:8050](http://localhost:8050) to access the interface.
+    When you run `make build`, the system will automatically detect whether a GPU is available and install the appropriate dependencies. If you don’t need embedding vectors, you can speed up the process by forcing a lightweight build with `make build EMBEDDING_MODE=NONE`.
+
+    After the initial build completes you only need to use `make` to start the service. Then open your browser to [http://localhost:8050](http://localhost:8050) to access the interface.
 
 4. **Stopping and Cleaning Up:**
 
@@ -73,12 +78,13 @@ Additionally, the `embedding_container` requires an NVIDIA GPU to run. I tested 
     make stop
     ```
 
-    To remove containers and images (this will not remove the mounted database):
+    To remove containers and images (this will not remove the mounted volumes):
 
     ```bash
     make clean
     ```
 5. **Other useful commands:**
+
     To run a jupyter notebook:
 
     ```bash
@@ -92,7 +98,9 @@ Additionally, the `embedding_container` requires an NVIDIA GPU to run. I tested 
 
 ## Modules
 
-### Data Collection (src/data_scrapping)
+### Data Collection
+
+Code and documentation in src/data_scrapping
 
 - **Scraping Engine:**
   Uses Cloudscaper to fetch data from news archives.
@@ -103,7 +111,9 @@ Additionally, the `embedding_container` requires an NVIDIA GPU to run. I tested 
 - **Collectors:**
   10 individual collectors can be aggregated for comprehensive data collection.
 
-### FrontEnd (src/helpers/layout)
+### Frontend
+
+Code in src/helpers/layout.py and assets/styles.css
 
 - **Carousel**: A carousel showing the collected articles with scrolling capabilities.
 
@@ -119,11 +129,13 @@ Additionally, the `embedding_container` requires an NVIDIA GPU to run. I tested 
 
 ### Backend
 
+Code in src/utils/callbacks.py and src/utils/celery_tasks.py
+
 - **Dash Callbacks:**
-  Orchestrate interactions between the front end and backend processes (code in src/utils/callbacks).
+  Orchestrate interactions between the front end and backend processes.
 
 - **Celery & Redis:**
-  Manage data collection task asynchronously (code in src/utils/celery_tasks).
+  Manage data collection task asynchronously.
 
 ### Database: (src/helpers/db_connector)
   - Use Postgres and pgvector extension as a vector db.
@@ -144,8 +156,8 @@ Additionally, the `embedding_container` requires an NVIDIA GPU to run. I tested 
 | `tag`             | `VARCHAR`                         | Nullable                                                                                                                       |
 | `link`            | `VARCHAR`                         | Not Null                                                                                                                       |
 | `hash`            | `BIGINT`                          | Computed as `hashtext(link)::BIGINT`, persisted; Not Null; Unique                                                              |
-| `embedding`       | `HALFVEC(1024)`           | Not Null; stores vector embeddings in HALFVEC format                                                                           |
-| `text_searchable` | `TSVECTOR`                        | Generated as `to_tsvector('french', coalesce(title, '') || ' ' || coalesce(content, ''))`, stored; GIN-indexed for full-text |
+| `embedding`       | `HALFVEC(1024)`           | stores vector embeddings in HALFVEC format                                                                           |
+| `text_searchable` | `TSVECTOR`                        | Generated as `to_tsvector('french', coalesce(title, '') \|\| ' ' \|\| coalesce (content, ''))` |
 
 
 **Indexes**

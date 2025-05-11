@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class DataCollector(ABC):
+    BATCH_EMBEDDING = 32
 
     def __init__(self, url_format, date2str, begin_date, end_date, timeout):
         super().__init__()
@@ -95,18 +96,18 @@ class DataCollector(ABC):
                         data[DBCOLUMNS.image] = img_path
                         data_list.append(data)
 
-                        if len(data_list) >= 32:
+                        if len(data_list) >= DataCollector.BATCH_EMBEDDING:
                             self.insert_batch(data_list)
                             data_list = []
 
                 except Exception as e:
                     logger.debug(f"Exception in parsing section from page {url}")
                     logger.debug(e)
-                    if len(data_list) >= 32:
+                    if len(data_list) >= DataCollector.BATCH_EMBEDDING:
                         self.insert_batch(data_list)
                         data_list = []
 
-            if len(data_list) >= 32:
+            if len(data_list) > 0:
                 self.insert_batch(data_list)
                 data_list = []
 
@@ -117,11 +118,17 @@ class DataCollector(ABC):
     def insert_batch(self, data_list):
         list_ = []
         embeddings = get_embeddings(data_list, self._embedding_url)
-        for data, emb in zip(data_list, embeddings):
-            data[DBCOLUMNS.embedding] = emb
-            list_.append(data)
+        if embeddings is not None:
+            for data, emb in zip(data_list, embeddings):
+                data[DBCOLUMNS.embedding] = emb
+                list_.append(data)
 
-        rowscount = DBConnector.insert_row(self.engine, DBConnector.TABLE, list_)
+            rowscount = DBConnector.insert_row(self.engine, DBConnector.TABLE, list_)
+        else:
+            rowscount = DBConnector.insert_row(
+                self.engine, DBConnector.TABLE, data_list
+            )
+
         logger.info(f"{rowscount} were inserted into the database")
 
     @abstractmethod
