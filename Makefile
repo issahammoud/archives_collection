@@ -19,7 +19,7 @@ export UID := $(shell id -u)
 export GID := $(shell id -g)
 export EMBEDDING_MODE
 export BASE_IMAGE
-export COMPOSE_PROJECT_NAME := archive_collection
+export COMPOSE_PROJECT_NAME := archives_collection
 
 
 all: run
@@ -40,13 +40,11 @@ stop:
 	@echo "→ Stopping all services…"
 	docker compose down
 
-clean: stop
+clean:
 	@echo "→ Cleaning up Docker resources..."
-	docker compose down --rmi local --remove-orphans
-	docker image prune -f \
-	  --filter "label=com.docker.compose.project=$(COMPOSE_PROJECT_NAME)"
-	docker network prune -f \
-	  --filter "label=com.docker.compose.project=$(COMPOSE_PROJECT_NAME)"
+	@if [ -n "$$(docker ps -aq)" ]; then docker rm -vf $$(docker ps -aq); fi
+	@if [ -n "$$(docker images -aq)" ]; then docker rmi -f $$(docker images -aq); fi
+	docker system prune -f
 	rm -rf .env.local
 
 jupyter:

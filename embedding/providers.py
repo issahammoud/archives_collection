@@ -34,8 +34,12 @@ class GPUProvider(EmbeddingProvider):
     def truncate(self, texts: List[str], max_tokens: int = 8192) -> List[str]:
         out = []
         for t in texts:
-            enc = self.tokenizer(t, truncation=True, max_length=max_tokens, return_tensors=None)
-            out.append(self.tokenizer.decode(enc["input_ids"], skip_special_tokens=True))
+            enc = self.tokenizer(
+                t, truncation=True, max_length=max_tokens, return_tensors=None
+            )
+            out.append(
+                self.tokenizer.decode(enc["input_ids"], skip_special_tokens=True)
+            )
         return out
 
     async def embed(self, texts: List[str]):

@@ -1,5 +1,4 @@
 import os
-import pandas as pd
 from sqlalchemy import (
     create_engine,
     MetaData,
@@ -14,7 +13,7 @@ from sqlalchemy import (
     BigInteger,
     true,
     tuple_,
-    literal,
+    literal
 )
 from sqlalchemy.sql import and_
 from pgvector.sqlalchemy import Vector, HALFVEC
@@ -392,18 +391,3 @@ class DBConnector:
     def insert_row(table_ref, values):
         insert_stmt = insert(table_ref).values(values).on_conflict_do_nothing()
         return insert_stmt
-
-    @staticmethod
-    def export_data_to_csv(engine, table, output_csv, columns):
-        chunksize = 100_000
-        metadata = MetaData()
-        table_ref = Table(table, metadata, autoload_with=engine)
-
-        selected_cols = [table_ref.c[col] for col in columns]
-        query = table_ref.select().with_only_columns(*selected_cols)
-        with engine.execute() as connection:
-            with open(output_csv, "w", encoding="utf-8", newline="") as file:
-                first_chunk = True
-                for chunk in pd.read_sql(query, connection, chunksize=chunksize):
-                    chunk.to_csv(file, index=False, header=first_chunk)
-                    first_chunk = False

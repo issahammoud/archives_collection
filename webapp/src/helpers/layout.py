@@ -595,9 +595,12 @@ class Layout:
                 ),
                 dcc.Store(id="states", data={}),
                 dcc.Store(id="job_status", data={}, storage_type="session"),
-                dcc.Download(id="download_csv"),
+                dcc.Location(id="redirect", refresh=True),
                 dcc.Interval(
                     id="interval", interval=5000, n_intervals=0, disabled=True
+                ),
+                dcc.Interval(
+                    id="download_interval", interval=2000, n_intervals=0, disabled=True
                 ),
                 dmc.AppShellHeader(
                     dmc.Container(

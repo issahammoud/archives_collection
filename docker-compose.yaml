@@ -47,16 +47,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       HNSW_EF_SEARCH: ${HNSW_EF_SEARCH}
     command: postgres -c work_mem=256MB -c shared_buffers=2GB
-    shm_size: '6gb'
-    ulimits:
-      nofile:
-        soft: 65535
-        hard: 65535
-      nproc: 65535
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
-      - ~/archives_collection_images:/images
 
   redis:
     image: redis:7.4.2

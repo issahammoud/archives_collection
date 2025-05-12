@@ -1,15 +1,15 @@
 import os
 import dash
 import logging
-import tempfile
 import pandas as pd
 from dash.exceptions import PreventUpdate
-from dash_extensions.enrich import Input, State, Output, callback, dcc
-from src.helpers.enum import DBCOLUMNS, OPERATORS
+from dash_extensions.enrich import Input, State, Output, callback
+
+from src.utils.utils import get_query_embedding
 from src.helpers.db_connector import DBConnector
 from src.helpers.layout import Layout, Navbar, Main
-from src.utils.utils import get_query_embedding
-from src.utils.celery_tasks import collection_task, revoke_task
+from src.helpers.enum import DBCOLUMNS, OPERATORS, CeleryTasks, JobsKeys
+from src.utils.celery_tasks import collection_task, revoke_task, download_task
 
 
 logger = logging.getLogger(__name__)
@@ -247,21 +247,25 @@ def group_by(value, states):
 
 
 @callback(
-    Output("download_csv", "data"),
+    Output("job_status", "data"),
+    Output("download_interval", "disabled"),
     Input("download", "n_clicks"),
     State("states", "data"),
     prevent_initial_call=True,
 )
-def download(n_clicks, states):
+def trigger_download(n_clicks, states):
     if n_clicks:
         archive = states["archive"]
         tag = states["tag"]
         date_range = states["date_range"]
         query = states["query"]
         null_clicks = states["null_clicks"]
+        order = states["order"]
 
         filters = get_filters_dict(archive, tag, date_range, True, null_clicks, query)
+
         columns = [
+            DBCOLUMNS.rowid,
             DBCOLUMNS.date,
             DBCOLUMNS.archive,
             DBCOLUMNS.link,
@@ -270,15 +274,47 @@ def download(n_clicks, states):
             DBCOLUMNS.tag,
             DBCOLUMNS.image,
         ]
-        data = DBConnector.get_all_rows(engine, DBConnector.TABLE, filters, columns)
-        df = pd.DataFrame(data, columns=columns)
-        return dcc.send_data_frame(df.to_csv, "data.csv")
+        try:
+            task = download_task.apply_async(args=(columns, filters, order))
+            job_status = {
+                JobsKeys.TASKID: task.id,
+                JobsKeys.STATUS: "start",
+                JobsKeys.TASKNAME: CeleryTasks.download,
+            }
+            return job_status, False
+        except Exception as e:
+            logger.error(f"Failed to start task: {str(e)}")
+            return dash.no_update, True, dash.no_update
 
     raise PreventUpdate
 
 
 @callback(
-    Output("job_status", "data"),
+    Output("redirect", "pathname"),
+    Output("download_interval", "disabled", allow_duplicate=True),
+    Input("download_interval", "n_intervals"),
+    State("job_status", "data"),
+    prevent_initial_call=True,
+)
+def get_downloaded_data(n, job_status):
+    if (
+        job_status
+        and JobsKeys.TASKID in job_status
+        and job_status[JobsKeys.TASKNAME] == CeleryTasks.download
+    ):
+        task_id = job_status[JobsKeys.TASKID]
+        result = download_task.AsyncResult(task_id)
+        if result.state == "PENDING" or result.state == "STARTED":
+            return dash.no_update, False
+        elif result.state == "FAILURE":
+            return dash.no_update, True
+        else:
+            return "/download-data", True
+    raise PreventUpdate
+
+
+@callback(
+    Output("job_status", "data", allow_duplicate=True),
     Output("interval", "disabled"),
     Input("start_collect", "n_clicks"),
     State("states", "data"),
@@ -293,10 +329,15 @@ def start_collection(n_clicks, states):
             task = collection_task.apply_async(
                 args=(archive, date_range[0], date_range[1])
             )
-            return {"task_id": task.id, "status": "start"}, False
+            job_status = {
+                JobsKeys.TASKID: task.id,
+                JobsKeys.STATUS: "start",
+                JobsKeys.TASKNAME: CeleryTasks.collect,
+            }
+            return job_status, False
         except Exception as e:
-            print(f"Failed to start task: {str(e)}")
-            return dash.no_update, True
+            logger.error(f"Failed to start task: {str(e)}")
+            return dash.no_update, True, dash.no_update
     raise PreventUpdate
 
 
@@ -309,7 +350,7 @@ def start_collection(n_clicks, states):
 def stop_collection(n_clicks, job_status):
     if n_clicks:
         status = job_status.copy()
-        status["status"] = "stop"
+        status["status"] = "STOP"
         return status
     raise PreventUpdate
 
@@ -323,12 +364,16 @@ def stop_collection(n_clicks, job_status):
     prevent_initial_call=True,
 )
 def refresh(n, job_status):
-    if job_status and "task_id" in job_status:
-        task_id = job_status["task_id"]
-        status = job_status["status"]
+    if (
+        job_status
+        and JobsKeys.TASKID in job_status
+        and job_status[JobsKeys.TASKNAME] == CeleryTasks.collect
+    ):
+        task_id = job_status[JobsKeys.TASKID]
+        status = job_status[JobsKeys.STATUS]
         task = collection_task.AsyncResult(task_id)
 
-        if status == "stop":
+        if status == "STOP":
             revoke_task(task_id)
             return True, False, True
         if task.state == "SUCCESS":
@@ -345,14 +390,18 @@ def refresh(n, job_status):
     prevent_initial_call=False,
 )
 def sync_controls_on_load(job_status):
-    if not job_status or "task_id" not in job_status:
+    if (
+        not job_status
+        or JobsKeys.TASKID not in job_status
+        or job_status[JobsKeys.TASKNAME] == CeleryTasks.download
+    ):
         return True, False, True
 
-    task_id = job_status["task_id"]
-    desired = job_status.get("status", "")
+    task_id = job_status[JobsKeys.TASKID]
+    desired = job_status.get(JobsKeys.STATUS, "")
     async_result = collection_task.AsyncResult(task_id)
 
-    if desired == "stop" or async_result.state in ("REVOKED", "SUCCESS", "FAILURE"):
+    if desired == "STOP" or async_result.state in ("REVOKED", "SUCCESS", "FAILURE"):
         return True, False, True
 
     return False, True, False

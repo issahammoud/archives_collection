@@ -24,7 +24,7 @@ Archives Collection is a Python-based project designed to collect, visualize and
 - **Front End:** Dash, Dash Mantine Components
 - **Back End:** Dash, Celery, Redis
 - **Database:** PostgreSQL with SQLAlchemy
-- **Search Engine:**: tsvector for text search, pgvector for semantic search
+- **Search Engine:** tsvector for text search, pgvector for semantic search
 - **Embedding Model**: Jina v3 for textual multilingue embeddings.
 
 ## Installation

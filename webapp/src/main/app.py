@@ -1,5 +1,6 @@
 import os
 import dash
+from flask import send_file
 from dash import CeleryManager
 import dash_mantine_components as dmc
 from dash_extensions.enrich import DashProxy, ServersideOutputTransform, RedisBackend
@@ -30,6 +31,20 @@ app = DashProxy(
 
 app.layout = Layout.get_layout
 server = app.server
+
+
+@server.route("/download-data")
+def stream_data_zip():
+    zip_path = "/images/data.zip"
+    if not os.path.exists(zip_path):
+        return "File not found", 404
+
+    return send_file(
+        zip_path,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name="data.zip",
+    )
 
 
 if __name__ == "__main__":

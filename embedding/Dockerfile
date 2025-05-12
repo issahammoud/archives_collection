@@ -13,15 +13,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY requirements-gpu.txt ./
 
+COPY . /embedding
+
 RUN --mount=type=cache,id=hf_cache,target=/root/.cache/huggingface \
     if [ "$EMBEDDING_MODE" = "GPU" ]; then \
       pip install --no-cache-dir -r requirements-gpu.txt && \
-      python download_model.py; \
+      python3 download_model.py; \
     else \
       echo "== Skipping GPU deps (mode=$EMBEDDING_MODE) =="; \
     fi
 
-COPY . /embedding
 
 EXPOSE 8000
 
