@@ -21,6 +21,7 @@ export EMBEDDING_MODE
 export BASE_IMAGE
 export COMPOSE_PROJECT_NAME := archives_collection
 
+_LABEL := com.docker.compose.project=$(COMPOSE_PROJECT_NAME)
 
 all: run
 
@@ -40,11 +41,16 @@ stop:
 	@echo "→ Stopping all services…"
 	docker compose down
 
-clean:
-	@echo "→ Cleaning up Docker resources..."
-	@if [ -n "$$(docker ps -aq)" ]; then docker rm -vf $$(docker ps -aq); fi
-	@if [ -n "$$(docker images -aq)" ]; then docker rmi -f $$(docker images -aq); fi
-	docker system prune -f
+clean: stop
+	@echo "→ Cleaning up Docker resources for project '$(COMPOSE_PROJECT_NAME)'…"
+	@if [ -n "$$(docker ps -aq -f label=$(_LABEL))" ]; then \
+	  docker rm -vf $$(docker ps -aq -f label=$(_LABEL)); \
+	fi
+	@if [ -n "$$(docker images -aq -f label=$(_LABEL))" ]; then \
+	  docker rmi -f $$(docker images -aq -f label=$(_LABEL)); \
+	fi
+	docker network prune -f --filter label=$(_LABEL)
+	docker image prune   -f --filter label=$(_LABEL)
 	rm -rf .env.local
 
 jupyter:
@@ -60,7 +66,7 @@ help:
 	@echo "  make build [EMBEDDING_MODE=<gpu|none>] Build all services"
 	@echo "  make run                               Run all services"
 	@echo "  make stop                              Stop all services"
-	@echo "  make clean                             Remove containers, images, volumes"
+	@echo "  make clean                             Remove all containers, images, and networks"
 	@echo "  make logs                              Tail all logs"
 	@echo "  make jupyter                           Open Jupyter in webapp_container"
 	@echo "  make help                              Show this message"

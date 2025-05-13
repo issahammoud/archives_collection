@@ -13,13 +13,14 @@ Archives Collection is a Python-based project designed to collect, visualize and
   - [Data Collection](#data-collection)
   - [Frontend](#frontend)
   - [Backend](#backend)
+  - [Embedding](#embedding)
   - [Database](#database)
 
 
 ## Technologies
 
 - **Programming Language:** Python
-- **Data Collection:** Cloudscaper, Beautiful Soup
+- **Data Collection:** Cloudscraper, Beautiful Soup
 - **Containerization:** Docker, Docker Compose, Makefile (for container management)
 - **Front End:** Dash, Dash Mantine Components
 - **Back End:** Dash, Celery, Redis
@@ -100,10 +101,10 @@ Moreover, to use the provided embedding service, you’ll need an NVIDIA GPU. If
 
 ### Data Collection
 
-Code and documentation in src/data_scrapping
+Code and documentation in webapp/src/data_scrapping
 
 - **Scraping Engine:**
-  Uses Cloudscaper to fetch data from news archives.
+  Uses Cloudscraper to fetch data from news archives.
 
 - **Design Patterns:**
   Implements Decorator, Registry, Strategy, and Factory patterns for a clean, scalable codebase.
@@ -113,7 +114,7 @@ Code and documentation in src/data_scrapping
 
 ### Frontend
 
-Code in src/helpers/layout.py and assets/styles.css
+Code in webapp/src/helpers/layout.py and webapp/assets/styles.css
 
 - **Carousel**: A carousel showing the collected articles with scrolling capabilities.
 
@@ -129,13 +130,24 @@ Code in src/helpers/layout.py and assets/styles.css
 
 ### Backend
 
-Code in src/utils/callbacks.py and src/utils/celery_tasks.py
+Code in webapp/src/utils/callbacks.py and webapp/src/utils/celery_tasks.py
 
 - **Dash Callbacks:**
   Orchestrate interactions between the front end and backend processes.
 
 - **Celery & Redis:**
   Manage data collection task asynchronously.
+
+### Embedding
+
+Code in embedding/
+
+- **FastAPI**:
+  Provides an asynchronous embedding API with support for multiple providers (currently Jina or None).
+
+- **vLLM**:
+  Hosts local embedding models via vLLM, applying an input truncation step before inference.
+
 
 ### Database: (src/helpers/db_connector)
   - Use Postgres and pgvector extension as a vector db.

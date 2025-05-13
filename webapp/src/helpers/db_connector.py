@@ -13,7 +13,7 @@ from sqlalchemy import (
     BigInteger,
     true,
     tuple_,
-    literal
+    literal,
 )
 from sqlalchemy.sql import and_
 from pgvector.sqlalchemy import Vector, HALFVEC

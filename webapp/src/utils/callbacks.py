@@ -350,7 +350,7 @@ def start_collection(n_clicks, states):
 def stop_collection(n_clicks, job_status):
     if n_clicks:
         status = job_status.copy()
-        status["status"] = "STOP"
+        status[JobsKeys.STATUS] = "STOP"
         return status
     raise PreventUpdate
 

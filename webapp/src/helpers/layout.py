@@ -198,7 +198,7 @@ class Navbar:
         )
         sorting = dmc.Tooltip(
             sorting,
-            label="date order",
+            label="flip order",
             multiline=True,
             withArrow=True,
             openDelay=3,
@@ -212,7 +212,7 @@ class Navbar:
         )
         null_img = dmc.Tooltip(
             null_img,
-            label="empty images",
+            label="filter images",
             multiline=True,
             withArrow=True,
             openDelay=3,
