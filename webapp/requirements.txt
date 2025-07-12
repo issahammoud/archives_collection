@@ -1,13 +1,13 @@
 ipykernel==6.29
 numpy==1.26
-pandas==2.1
+pandas==2.3
 jupyter==1.0
 tqdm==4.66
 gunicorn==21.2
-dash[celery]==2.18.2
-dash-extensions==1.0.20
+dash[celery]==3.0.4
+dash-extensions==2.0.4
 celery[redis]==5.4.0
-dash-mantine-components==0.15
+dash-mantine-components==2.0.0
 dash-iconify==0.1.2
 SQLAlchemy==2.0.29
 psycopg2-binary==2.9.9

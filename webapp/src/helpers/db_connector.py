@@ -47,7 +47,7 @@ class DBConnector:
         OPERATORS.notnull: lambda column, _: column.isnot(None),
         OPERATORS.isnull: lambda column, _: column.is_(None),
         OPERATORS.ts: lambda column, value: text(
-            f"{column.name} @@ to_tsquery('french', :query)"
+            f"{column.name} @@ plainto_tsquery('french', :query)"
         ).bindparams(query=value),
         OPERATORS.vs: lambda column, value: column.op("<#>")(
             bindparam("query", value, type_=Vector(DBConnector.VECTOR_DIM))
