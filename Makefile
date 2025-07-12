@@ -11,7 +11,7 @@ EMBEDDING_MODE ?= $(DETECTED_GPU_MODE)
 ifeq ($(EMBEDDING_MODE),GPU)
   BASE_IMAGE := vllm/vllm-openai:v0.8.5
 else
-  BASE_IMAGE := python:3.10-slim
+  BASE_IMAGE := python:3.12-slim
 endif
 
 
@@ -43,19 +43,18 @@ stop:
 
 clean: stop
 	@echo "→ Cleaning up Docker resources for project '$(COMPOSE_PROJECT_NAME)'…"
-	@if [ -n "$$(docker ps -aq -f label=$(_LABEL))" ]; then \
-	  docker rm -vf $$(docker ps -aq -f label=$(_LABEL)); \
+	@if [ -n "$$(docker ps -aq)" ]; then \
+	  docker rm -vf $$(docker ps -aq); \
 	fi
-	@if [ -n "$$(docker images -aq -f label=$(_LABEL))" ]; then \
-	  docker rmi -f $$(docker images -aq -f label=$(_LABEL)); \
+	@if [ -n "$$(docker images -aq)" ]; then \
+	  docker rmi -f $$(docker images -aq); \
 	fi
-	docker network prune -f --filter label=$(_LABEL)
-	docker image prune   -f --filter label=$(_LABEL)
+	docker system prune -f
 	rm -rf .env.local
 
 jupyter:
 	@echo "→ Run a jupyter notebook. Connect to localhost:8888 from your editor..."
-	docker exec -it webapp_container bash -c 'export HOME=/tmp && jupyter notebook --ip=0.0.0.0 --port=8888 --allow-root --IdentityProvider.token="" 2>&1'
+	docker compose exec webapp bash -c 'export HOME=/tmp && jupyter notebook --ip=0.0.0.0 --port=8888 --allow-root --IdentityProvider.token="" 2>&1'
 
 logs:
 	@echo "→ Showing all containers logs..."

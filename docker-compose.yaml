@@ -26,21 +26,18 @@ services:
 
   webapp:
     <<: *webapp_base
-    container_name: webapp_container
     ports:
       - "8050:8050"
       - "8888:8888"
 
   celery:
     <<: *webapp_base
-    container_name: celery_worker
     command: celery -A src.main.celery_app.celery_app worker --loglevel=debug
     cpu_period: 100000
     cpu_quota: 1000000
 
   db:
     image: pgvector/pgvector:pg17
-    container_name: postgres_container
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -53,12 +50,10 @@ services:
 
   redis:
     image: redis:7.4.2
-    container_name: redis_container
     ports:
       - "6379:6379"
 
   embedding:
-    container_name: embedding_container
     build:
       context: embedding/
       dockerfile: Dockerfile

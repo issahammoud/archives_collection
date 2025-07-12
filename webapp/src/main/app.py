@@ -12,9 +12,6 @@ import src.utils.callbacks
 
 
 logger = logging.getLogger(__name__)
-dash._dash_renderer._set_react_version("18.2.0")
-
-
 background_callback_manager = CeleryManager(celery_app)
 
 

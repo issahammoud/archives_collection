@@ -34,13 +34,7 @@ def get_filters_dict(archive, tag, date_range, submit, null_clicks, query):
                 filters.update({DBCOLUMNS.embedding: [(OPERATORS.vs, embedding)]})
             else:
                 logger.debug("Falling back to tsvector search")
-                filters.update(
-                    {
-                        DBCOLUMNS.text_searchable: [
-                            (OPERATORS.ts, " & ".join(query.split()))
-                        ]
-                    }
-                )
+                filters.update({DBCOLUMNS.text_searchable: [(OPERATORS.ts, query)]})
 
     filters.update(
         {DBCOLUMNS.image: [(OPERATORS.notnull, None)]}
@@ -247,8 +241,9 @@ def group_by(value, states):
 
 
 @callback(
-    Output("job_status", "data"),
+    Output("download_status", "data"),
     Output("download_interval", "disabled"),
+    Output("notification-container", "sendNotifications"),
     Input("download", "n_clicks"),
     State("states", "data"),
     prevent_initial_call=True,
@@ -281,7 +276,7 @@ def trigger_download(n_clicks, states):
                 JobsKeys.STATUS: "start",
                 JobsKeys.TASKNAME: CeleryTasks.download,
             }
-            return job_status, False
+            return job_status, False, Layout.download_notif()
         except Exception as e:
             logger.error(f"Failed to start task: {str(e)}")
             return dash.no_update, True, dash.no_update
@@ -293,7 +288,7 @@ def trigger_download(n_clicks, states):
     Output("redirect", "pathname"),
     Output("download_interval", "disabled", allow_duplicate=True),
     Input("download_interval", "n_intervals"),
-    State("job_status", "data"),
+    State("download_status", "data"),
     prevent_initial_call=True,
 )
 def get_downloaded_data(n, job_status):
@@ -316,6 +311,7 @@ def get_downloaded_data(n, job_status):
 @callback(
     Output("job_status", "data", allow_duplicate=True),
     Output("interval", "disabled"),
+    Output("notification-container", "sendNotifications", allow_duplicate=True),
     Input("start_collect", "n_clicks"),
     State("states", "data"),
     prevent_initial_call=True,
@@ -334,7 +330,7 @@ def start_collection(n_clicks, states):
                 JobsKeys.STATUS: "start",
                 JobsKeys.TASKNAME: CeleryTasks.collect,
             }
-            return job_status, False
+            return job_status, False, Layout.collect_notif()
         except Exception as e:
             logger.error(f"Failed to start task: {str(e)}")
             return dash.no_update, True, dash.no_update
@@ -350,35 +346,10 @@ def start_collection(n_clicks, states):
 def stop_collection(n_clicks, job_status):
     if n_clicks:
         status = job_status.copy()
+        task_id = status[JobsKeys.TASKID]
+        revoke_task(task_id)
         status[JobsKeys.STATUS] = "STOP"
         return status
-    raise PreventUpdate
-
-
-@callback(
-    Output("interval", "disabled", allow_duplicate=True),
-    Output("start_collect", "disabled"),
-    Output("stop_collect", "disabled"),
-    Input("interval", "n_intervals"),
-    State("job_status", "data"),
-    prevent_initial_call=True,
-)
-def refresh(n, job_status):
-    if (
-        job_status
-        and JobsKeys.TASKID in job_status
-        and job_status[JobsKeys.TASKNAME] == CeleryTasks.collect
-    ):
-        task_id = job_status[JobsKeys.TASKID]
-        status = job_status[JobsKeys.STATUS]
-        task = collection_task.AsyncResult(task_id)
-
-        if status == "STOP":
-            revoke_task(task_id)
-            return True, False, True
-        if task.state == "SUCCESS":
-            return True, False, True
-        return False, True, False
     raise PreventUpdate
 
 

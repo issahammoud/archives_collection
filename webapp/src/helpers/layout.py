@@ -515,11 +515,13 @@ class Main:
             w="100%",
             id="carousel",
             slideGap="md",
-            loop=False,
-            align="center",
             initialSlide=0,
-            dragFree=False,
-            slidesToScroll=Layout.SLIDES,
+            emblaOptions={
+                "loop": False,
+                "align": "center",
+                "slidesToScroll": Layout.SLIDES,
+                "dragFree": False,
+            },
             nextControlIcon=DashIconify(
                 icon="material-symbols:navigate-next", color="#0097b2"
             ),
@@ -571,6 +573,50 @@ class Layout:
     MAX_PAGES = 10
 
     @staticmethod
+    def collect_notif():
+        message = dmc.Text(
+            "The data collection started. "
+            "The interface will be updated each 5 seconds to show new data.",
+            c="dimmed",
+            fw=300,
+        )
+        return [
+            dict(
+                id="collect_notif",
+                title=dmc.Text("Collection Started", fw=500),
+                message=message,
+                position="top-center",
+                loading=False,
+                color="#ff5757",
+                action="show",
+                autoClose=5000,
+                icon=DashIconify(icon="ic:round-celebration"),
+            )
+        ]
+
+    @staticmethod
+    def download_notif():
+        message = dmc.Text(
+            "The data is being prepared for downloading. "
+            "You will get a zip with one or multiple csv files based on the number of rows.",
+            c="dimmed",
+            fw=300,
+        )
+        return [
+            dict(
+                id="download_notif",
+                title=dmc.Text("Downloading", fw=500),
+                message=message,
+                position="top-center",
+                loading=False,
+                color="#ff5757",
+                action="show",
+                autoClose=5000,
+                icon=DashIconify(icon="icons8:download-2"),
+            )
+        ]
+
+    @staticmethod
     def get_footer():
         return dmc.Box(
             dmc.Text(
@@ -595,6 +641,7 @@ class Layout:
                 ),
                 dcc.Store(id="states", data={}),
                 dcc.Store(id="job_status", data={}, storage_type="session"),
+                dcc.Store(id="download_status", data={}),
                 dcc.Location(id="redirect", refresh=True),
                 dcc.Interval(
                     id="interval", interval=5000, n_intervals=0, disabled=True
@@ -602,6 +649,7 @@ class Layout:
                 dcc.Interval(
                     id="download_interval", interval=2000, n_intervals=0, disabled=True
                 ),
+                dmc.NotificationContainer(id="notification-container"),
                 dmc.AppShellHeader(
                     dmc.Container(
                         header,
