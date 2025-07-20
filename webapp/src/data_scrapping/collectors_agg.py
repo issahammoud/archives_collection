@@ -1,17 +1,18 @@
 import time
 import logging
+import argparse
 import numpy as np
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from src.helpers.enum import DBCOLUMNS
 from src.utils.utils import alternate_elements
-from src.helpers.db_connector import DBConnector
+from src.helpers.db_connector import DBConnector, DBManager
 from src.data_scrapping.collectors_registry import Registry
 
 
 logger = logging.getLogger(__name__)
-engine = DBConnector.get_engine()
+db_manager = DBManager()
 
 
 class CollectorsAggregator:
@@ -45,14 +46,16 @@ class CollectorsAggregator:
                 break
 
     def run(self):
-        DBConnector.create_table(engine, DBConnector.TABLE)
+        DBConnector.create_table(db_manager.engine, DBConnector.TABLE)
         urls = self.get_all_urls()
 
         count_before = {}
         for collector in self.collectors:
             name = collector.archive
             count_before[name] = DBConnector.get_total_count(
-                engine, DBConnector.TABLE, filters={DBCOLUMNS.archive: [("eq", name)]}
+                db_manager.engine,
+                DBConnector.TABLE,
+                filters={DBCOLUMNS.archive: [("eq", name)]},
             )
             logger.info(
                 f"We already collected {count_before[name]} articles for {name} archive."
@@ -71,7 +74,9 @@ class CollectorsAggregator:
         for collector in self.collectors:
             name = collector.archive
             rows_nb = DBConnector.get_total_count(
-                engine, DBConnector.TABLE, filters={DBCOLUMNS.archive: [("eq", name)]}
+                db_manager.engine,
+                DBConnector.TABLE,
+                filters={DBCOLUMNS.archive: [("eq", name)]},
             )
             diff = rows_nb - count_before[name]
             logger.info(
@@ -79,3 +84,18 @@ class CollectorsAggregator:
                 f"{diff} sections were collected in {end} min. "
                 f"We have in total {rows_nb} sections."
             )
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "-s", "--begin_date", type=str, required=True, help="start date"
+    )
+    parser.add_argument("-e", "--end_date", type=str, required=True, help="end date")
+    parser.add_argument("-t", "--timeout", type=float, required=True, help="timeout")
+    args = parser.parse_args()
+
+    print(vars(args))
+    aggregator = CollectorsAggregator(**vars(args))
+    aggregator.run()

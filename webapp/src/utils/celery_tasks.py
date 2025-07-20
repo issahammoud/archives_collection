@@ -5,13 +5,13 @@ import pandas as pd
 from io import StringIO
 
 from src.main.celery_app import celery_app
-from src.helpers.db_connector import DBConnector
+from src.helpers.db_connector import DBConnector, DBManager
 from src.helpers.enum import DBCOLUMNS, CeleryTasks, JobsKeys
 from src.data_scrapping.collectors_agg import CollectorsAggregator
 
 
 logger = logging.getLogger(__name__)
-engine = DBConnector.get_engine()
+db_manager = DBManager()
 
 
 @celery_app.task(name=CeleryTasks.collect, bind=False)
@@ -42,7 +42,7 @@ def download_task(columns, filters, order):
         last_seen = None
         while True:
             args = DBConnector.fetch_data_keyset(
-                engine,
+                db_manager.engine,
                 DBConnector.TABLE,
                 last_seen_value=last_seen,
                 limit=CHUNK_SIZE,

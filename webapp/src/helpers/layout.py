@@ -5,11 +5,11 @@ from datetime import datetime
 import plotly.graph_objs as go
 from dash_iconify import DashIconify
 import dash_mantine_components as dmc
-from src.helpers.db_connector import DBConnector
 from src.helpers.enum import Archives, DBCOLUMNS
+from src.helpers.db_connector import DBConnector, DBManager
 from src.utils.utils import resize_image_for_html, convert_count_to_str
 
-engine = DBConnector.get_engine()
+db_manager = DBManager()
 
 
 class Graph:
@@ -127,7 +127,9 @@ class Navbar:
 
     @staticmethod
     def filter_by_date():
-        min_max_dates = DBConnector.get_min_max_dates(engine, DBConnector.TABLE)
+        min_max_dates = DBConnector.get_min_max_dates(
+            db_manager.engine, DBConnector.TABLE
+        )
         min_max_dates = (
             min_max_dates[0]
             if min_max_dates is not None
@@ -148,7 +150,7 @@ class Navbar:
 
     @staticmethod
     def filter_by_tag():
-        tags = DBConnector.get_tags(engine, DBConnector.TABLE)
+        tags = DBConnector.get_tags(db_manager.engine, DBConnector.TABLE)
         tags = tags if tags is not None else []
         tags = [tag.title() for tag in tags if tag and not tag.isnumeric()]
         select = dmc.Select(
@@ -310,7 +312,7 @@ class Navbar:
     @staticmethod
     def get_navbar(total_count=None):
         total_count = total_count or DBConnector.get_total_count(
-            engine, DBConnector.TABLE
+            db_manager.engine, DBConnector.TABLE
         )
         total_count = total_count if total_count else 0
 
@@ -589,7 +591,7 @@ class Layout:
                 loading=False,
                 color="#ff5757",
                 action="show",
-                autoClose=5000,
+                autoClose=10000,
                 icon=DashIconify(icon="ic:round-celebration"),
             )
         ]
@@ -598,7 +600,7 @@ class Layout:
     def download_notif():
         message = dmc.Text(
             "The data is being prepared for downloading. "
-            "You will get a zip with one or multiple csv files based on the number of rows.",
+            "You will get a zip with one or multiple csv files.",
             c="dimmed",
             fw=300,
         )
@@ -611,7 +613,7 @@ class Layout:
                 loading=False,
                 color="#ff5757",
                 action="show",
-                autoClose=5000,
+                autoClose=10000,
                 icon=DashIconify(icon="icons8:download-2"),
             )
         ]
@@ -620,7 +622,7 @@ class Layout:
     def get_footer():
         return dmc.Box(
             dmc.Text(
-                "© Copyright Intuitive Deep Learning 2025.",
+                f"© Copyright Intuitive Deep Learning {datetime.now().year}.",
                 size="sm",
             ),
             mt=8,

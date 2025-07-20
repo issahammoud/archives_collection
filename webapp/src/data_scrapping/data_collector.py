@@ -2,18 +2,18 @@ import re
 import os
 import logging
 import dateparser
-import numpy as np
 import pandas as pd
 from bs4 import BeautifulSoup
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, date
 
 from src.helpers.enum import DBCOLUMNS
-from src.helpers.db_connector import DBConnector
 from src.data_scrapping.strategy import StrategyFactory
+from src.helpers.db_connector import DBConnector, DBManager
 from src.utils.utils import save_image, get_image_path, get_embeddings
 
 logger = logging.getLogger(__name__)
+db_manager = DBManager()
 
 
 class DataCollector(ABC):
@@ -29,13 +29,8 @@ class DataCollector(ABC):
         self.timeout = timeout
         self._translation_table = str.maketrans("éàèùâêîôûç", "eaeuaeiouc")
         self._fetch_strategy = StrategyFactory(self)
-        self.engine = None
         self._data_dir = "/images/"
         self._embedding_url = os.getenv("EMBED_URL")
-
-    def _init_engine(self):
-        if self.engine is None:
-            self.engine = DBConnector.get_engine()
 
     def match_format(self, url):
         return bool(
@@ -78,7 +73,6 @@ class DataCollector(ABC):
         return sections, parsed_content
 
     def parse_single_page(self, date, url):
-        self._init_engine()
         try:
             sections, _ = self.get_sections(url)
             logger.debug(f"Page {url} contains {len(sections)} sections")
@@ -123,10 +117,12 @@ class DataCollector(ABC):
                 data[DBCOLUMNS.embedding] = emb
                 list_.append(data)
 
-            rowscount = DBConnector.insert_row(self.engine, DBConnector.TABLE, list_)
+            rowscount = DBConnector.insert_row(
+                db_manager.engine, DBConnector.TABLE, list_
+            )
         else:
             rowscount = DBConnector.insert_row(
-                self.engine, DBConnector.TABLE, data_list
+                db_manager.engine, DBConnector.TABLE, data_list
             )
 
         logger.info(f"{rowscount} were inserted into the database")

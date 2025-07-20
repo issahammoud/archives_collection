@@ -56,6 +56,7 @@ jupyter:
 	@echo "→ Run a jupyter notebook. Connect to localhost:8888 from your editor..."
 	docker compose exec webapp bash -c 'export HOME=/tmp && jupyter notebook --ip=0.0.0.0 --port=8888 --allow-root --IdentityProvider.token="" 2>&1'
 
+
 logs:
 	@echo "→ Showing all containers logs..."
 	docker compose logs -f
