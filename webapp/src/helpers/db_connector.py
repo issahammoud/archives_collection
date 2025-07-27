@@ -358,7 +358,7 @@ class DBConnector:
 
 
 class DynamicFilters:
-    TOP_K = 1000
+    TOP_K = os.getenv("HNSW_EF_SEARCH", 100)
     THRESHOLD = 0
     VECTOR_WEIGHT = 2.0
     BM25_WEIGHT = 1.0

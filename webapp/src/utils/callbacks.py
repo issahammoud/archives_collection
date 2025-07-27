@@ -356,9 +356,10 @@ def stop_collection(n_clicks, job_status):
     Output("start_collect", "disabled", allow_duplicate=True),
     Output("stop_collect", "disabled", allow_duplicate=True),
     Input("job_status", "data"),
+    Input("interval", "n_intervals"),
     prevent_initial_call=False,
 )
-def sync_controls_on_load(job_status):
+def sync_controls_on_load(job_status, n):
     if (
         not job_status
         or JobsKeys.TASKID not in job_status
