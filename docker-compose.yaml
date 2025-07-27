@@ -43,10 +43,52 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       HNSW_EF_SEARCH: ${HNSW_EF_SEARCH}
-    command: postgres -c work_mem=256MB -c shared_buffers=2GB
+    command: >
+      postgres
+      -c shared_buffers=6GB
+      -c effective_cache_size=8GB
+      -c work_mem=64MB
+      -c maintenance_work_mem=512MB
+      -c max_connections=200
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c autovacuum_max_workers=3
+      -c autovacuum_naptime=30s
+      -c max_wal_size=2GB
+      -c min_wal_size=1GB
+      -c log_min_duration_statement=4000
+    shm_size: 4gb
+    deploy:
+      resources:
+        limits:
+          memory: 8GB
+        reservations:
+          memory: 4GB
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    restart: unless-stopped
+
+  pgbouncer:
+    image: bitnami/pgbouncer:latest
+    environment:
+      PGBOUNCER_DATABASE: ${POSTGRES_DB}
+      POSTGRESQL_USERNAME: ${POSTGRES_USER}
+      POSTGRESQL_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRESQL_HOST: db
+      POSTGRESQL_PORT: 5432
+      PGBOUNCER_PORT: 5432
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_MAX_CLIENT_CONN: 1000
+      PGBOUNCER_DEFAULT_POOL_SIZE: 25
+    ports:
+      - "5433:5432"
+    depends_on:
+      - db
+    restart: unless-stopped
 
   redis:
     image: redis:7.4.2

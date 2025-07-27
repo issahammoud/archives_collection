@@ -9,7 +9,7 @@ import itertools
 import numpy as np
 from functools import wraps
 from wand.image import Image as WandImage
-from sqlalchemy import inspect, MetaData, Table, text, Select
+from sqlalchemy import inspect, MetaData, Table, text
 
 from src.helpers.enum import DBCOLUMNS
 
@@ -96,7 +96,6 @@ def execute(func):
     @wraps(func)
     def wrapper(engine, table, *args, **kwargs):
         ef_search = os.getenv("HNSW_EF_SEARCH", 1000)
-
         inspector = inspect(engine)
         if table not in inspector.get_table_names():
             return None
@@ -105,20 +104,23 @@ def execute(func):
         table_ref = Table(table, metadata, autoload_with=engine)
 
         with engine.connect() as connection:
-            with connection.begin() as transaction:
+            with connection.begin():
                 connection.execute(
                     text("SET LOCAL hnsw.ef_search = :ef_val"), {"ef_val": ef_search}
                 )
+                connection.execute(
+                    text("SET LOCAL hnsw.iterative_scan = relaxed_order")
+                )
                 query = func(table_ref, *args, **kwargs)
-                logger.debug(
-                    f"{func.__name__}: "
-                    + str(
-                        query.compile(
-                            engine,
-                            compile_kwargs={"literal_binds": True},
-                        )
+                query_str = str(
+                    query.compile(
+                        engine,
+                        compile_kwargs={"literal_binds": True},
                     )
                 )
+                pattern = r"\[\s*[\d\.\-eE+, \s]+\s*\]"
+                query_str = re.sub(pattern, ":'query_vector'::halfvec", query_str)
+                logger.debug(f"{func.__name__}: {query_str}\n{'*'.join(['*']*50)}")
                 result = connection.execute(query)
                 if result.returns_rows:
                     rows = result.fetchall()

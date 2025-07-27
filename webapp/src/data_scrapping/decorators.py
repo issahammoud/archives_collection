@@ -1,13 +1,12 @@
 import logging
-import numpy as np
 import pandas as pd
 from src.helpers.enum import DBCOLUMNS
-from src.helpers.db_connector import DBConnector
+from src.helpers.db_connector import DBConnector, DBManager
 from src.data_scrapping.data_collector import DataCollector
 
 
 logger = logging.getLogger(__name__)
-engine = DBConnector.get_engine()
+db_manager = DBManager()
 
 
 class Decorator(DataCollector):
@@ -87,7 +86,7 @@ class RemoveDoneDates(Decorator):
             DBCOLUMNS.date: [("ge", date_range[0]), ("le", date_range[1])],
         }
         done_dates = DBConnector.get_done_dates(
-            engine,
+            db_manager.engine,
             DBConnector.TABLE,
             filters=self._filters,
         )
@@ -105,7 +104,7 @@ class RemoveDoneDates(Decorator):
     def _lazy_load_urls(self):
         if self._done_urls is None:
             done_urls = DBConnector.get_all_rows(
-                engine,
+                db_manager.engine,
                 DBConnector.TABLE,
                 filters=self._filters,
                 columns=[DBCOLUMNS.link],

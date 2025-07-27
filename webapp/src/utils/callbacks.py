@@ -6,14 +6,15 @@ from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import Input, State, Output, callback
 
 from src.utils.utils import get_query_embedding
-from src.helpers.db_connector import DBConnector
 from src.helpers.layout import Layout, Navbar, Main
+from src.helpers.db_connector import DBConnector, DBManager
 from src.helpers.enum import DBCOLUMNS, OPERATORS, CeleryTasks, JobsKeys
 from src.utils.celery_tasks import collection_task, revoke_task, download_task
 
 
 logger = logging.getLogger(__name__)
-engine = DBConnector.get_engine()
+
+db_manager = DBManager()
 
 
 def get_filters_dict(archive, tag, date_range, submit, null_clicks, query):
@@ -26,15 +27,11 @@ def get_filters_dict(archive, tag, date_range, submit, null_clicks, query):
     filters.update({DBCOLUMNS.archive: [(OPERATORS.in_, archive)]} if archive else {})
 
     if submit and query:
-        if len(query.split()) == 1:
-            filters.update({DBCOLUMNS.text_searchable: [(OPERATORS.ts, query)]})
-        else:
-            embedding = get_query_embedding(query, os.getenv("EMBED_URL"))
-            if embedding:
-                filters.update({DBCOLUMNS.embedding: [(OPERATORS.vs, embedding)]})
-            else:
-                logger.debug("Falling back to tsvector search")
-                filters.update({DBCOLUMNS.text_searchable: [(OPERATORS.ts, query)]})
+
+        filters.update({DBCOLUMNS.text_searchable: [(OPERATORS.ts, query)]})
+        embedding = get_query_embedding(query, os.getenv("EMBED_URL"))
+        if embedding:
+            filters.update({DBCOLUMNS.embedding: [(OPERATORS.vs, embedding)]})
 
     filters.update(
         {DBCOLUMNS.image: [(OPERATORS.notnull, None)]}
@@ -78,7 +75,7 @@ def create_content(
     }
 
     args = DBConnector.fetch_data_keyset(
-        engine,
+        db_manager.engine,
         DBConnector.TABLE,
         limit=Layout.SLIDES * Layout.MAX_PAGES,
         filters=filters,
@@ -95,25 +92,26 @@ def create_content(
         desc_order=order,
     )
     args = args if args else []
-    total_count = DBConnector.get_total_count(engine, DBConnector.TABLE, filters)
+    total_count = DBConnector.get_total_count(
+        db_manager.engine, DBConnector.TABLE, filters
+    )
     total_count = total_count if total_count else 0
 
     badge = Navbar.get_badge(total_count)
     if len(args) > Layout.SLIDES:
 
         df = pd.DataFrame(
-            DBConnector.group_by(engine, DBConnector.TABLE, groupby, filters),
+            DBConnector.group_by(
+                db_manager.engine, DBConnector.TABLE, groupby, filters
+            ),
             columns=["date", "count"],
         )
         last_seen = {
             "forward": {
-                DBCOLUMNS.date: args[-1 - Layout.SLIDES][-2],
-                DBCOLUMNS.rowid: args[-1 - Layout.SLIDES][0],
+                DBCOLUMNS.date: args[-1][-2],
+                DBCOLUMNS.rowid: args[-1][0],
             },
-            "backward": {
-                DBCOLUMNS.date: args[Layout.SLIDES][-2],
-                DBCOLUMNS.rowid: args[Layout.SLIDES][0],
-            },
+            "backward": {DBCOLUMNS.date: args[0][-2], DBCOLUMNS.rowid: args[0][0]},
         }
 
         return Main.get_main(df, args, not order), badge, last_seen, 0, states
@@ -143,14 +141,14 @@ def update_carousel(active, previous_active, last_seen, states):
         filters = get_filters_dict(archive, tag, date_range, True, null_clicks, query)
 
         direction = "forward" if active > previous_active else "backward"
+        direction = direction if active != previous_active else "no_change"
 
-        if (
-            (direction == "forward" and active == Layout.MAX_PAGES - 1)
-            or (direction == "backward" and active == 0)
-        ) and previous_active != 0:
+        if (direction == "forward" and active == Layout.MAX_PAGES - 1) or (
+            direction == "backward" and active == 0
+        ):
 
             args = DBConnector.fetch_data_keyset(
-                engine,
+                db_manager.engine,
                 DBConnector.TABLE,
                 limit=Layout.SLIDES * Layout.MAX_PAGES,
                 filters=filters,
@@ -172,19 +170,19 @@ def update_carousel(active, previous_active, last_seen, states):
                 args = args if direction == "forward" else args[::-1]
 
                 last_seen["forward"] = {
-                    DBCOLUMNS.date: args[-1 - Layout.SLIDES][-2],
-                    DBCOLUMNS.rowid: args[-1 - Layout.SLIDES][0],
+                    DBCOLUMNS.date: args[-1][-2],
+                    DBCOLUMNS.rowid: args[-1][0],
                 }
                 last_seen["backward"] = {
-                    DBCOLUMNS.date: args[Layout.SLIDES][-2],
-                    DBCOLUMNS.rowid: args[Layout.SLIDES][0],
+                    DBCOLUMNS.date: args[0][-2],
+                    DBCOLUMNS.rowid: args[0][0],
                 }
-            return (
-                Main.get_carousel_slides(args),
-                0 if direction == "forward" else Layout.MAX_PAGES - 1,
-                last_seen,
-                0,
-            )
+                return (
+                    Main.get_carousel_slides(args),
+                    0 if direction == "forward" else Layout.MAX_PAGES - 1,
+                    last_seen,
+                    0 if direction == "forward" else Layout.MAX_PAGES - 1,
+                )
 
         return dash.no_update, active, last_seen, active
     raise PreventUpdate
@@ -233,7 +231,7 @@ def group_by(value, states):
         filters = get_filters_dict(archive, tag, date_range, True, null_clicks, query)
 
         df = pd.DataFrame(
-            DBConnector.group_by(engine, DBConnector.TABLE, value, filters),
+            DBConnector.group_by(db_manager.engine, DBConnector.TABLE, value, filters),
             columns=["date", "count"],
         )
         return Main.get_stats(df, not order), False
@@ -358,9 +356,10 @@ def stop_collection(n_clicks, job_status):
     Output("start_collect", "disabled", allow_duplicate=True),
     Output("stop_collect", "disabled", allow_duplicate=True),
     Input("job_status", "data"),
+    Input("interval", "n_intervals"),
     prevent_initial_call=False,
 )
-def sync_controls_on_load(job_status):
+def sync_controls_on_load(job_status, n):
     if (
         not job_status
         or JobsKeys.TASKID not in job_status
