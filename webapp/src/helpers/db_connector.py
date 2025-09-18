@@ -444,7 +444,7 @@ class DynamicFilters:
             .subquery("text_search_base")
         )
 
-        return (text_base,)
+        return text_base
 
     @staticmethod
     def _create_vector_search_base(table_ref, vec_ops):
