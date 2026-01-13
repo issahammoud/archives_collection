@@ -1,8 +1,8 @@
 services:
 
-  webapp_base: &webapp_base
+  backend_base: &backend_base
     build:
-      context: webapp/
+      context: backend/
       dockerfile: Dockerfile
       args:
         HOST_UID: "${UID}"
@@ -12,6 +12,8 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379/0
       - EMBED_URL=http://embedding:8000/v1/embeddings
+      - DATABASE_HOST=pgbouncer
+      - DATABASE_PORT=5432
     depends_on:
       db:
         condition: service_started
@@ -19,22 +21,35 @@ services:
         condition: service_started
       embedding:
         condition: service_healthy
-
     volumes:
-      - ./webapp/:/webapp
+      - ./backend/:/backend
       - ~/archives_collection_images:/images
 
-  webapp:
-    <<: *webapp_base
+  backend:
+    <<: *backend_base
     ports:
-      - "8050:8050"
-      - "8888:8888"
+      - "8000:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   celery:
-    <<: *webapp_base
-    command: celery -A src.main.celery_app.celery_app worker --loglevel=debug
+    <<: *backend_base
+    command: celery -A app.core.celery_app.celery_app worker --loglevel=debug
     cpu_period: 100000
     cpu_quota: 1000000
+
+  frontend:
+    build:
+      context: frontend/
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/frontend
+      - /frontend/node_modules
+    environment:
+      - VITE_API_URL=http://backend:8000
 
   db:
     image: pgvector/pgvector:pg17
@@ -106,7 +121,7 @@ services:
     env_file:
       - .env.local
     ports:
-      - "8000:8000"
+      - "8001:8000"
     deploy:
       resources:
         reservations:

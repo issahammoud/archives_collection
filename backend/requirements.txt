@@ -1,0 +1,45 @@
+# FastAPI
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.0
+
+# Database
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+psycopg2-binary==2.9.10
+pgvector==0.3.6
+alembic==1.14.0
+
+# Celery
+celery==5.4.0
+redis==5.2.1
+
+# HTTP Client
+httpx==0.28.1
+requests==2.32.3
+
+# Data processing
+pandas==2.2.3
+numpy==2.2.1
+orjson==3.10.12
+
+# Web scraping
+beautifulsoup4==4.12.3
+cloudscraper==1.2.71
+dateparser==1.2.0
+babel==2.16.0
+
+# Image processing
+Wand==0.6.13
+
+# Utilities
+tqdm==4.67.1
+python-multipart==0.0.20
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+httpx==0.28.1
+aiosqlite==0.20.0

@@ -1,0 +1,36 @@
+{
+  "name": "archives-collection-frontend",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@mantine/core": "^7.15.0",
+    "@mantine/dates": "^7.15.0",
+    "@mantine/hooks": "^7.15.0",
+    "@mantine/notifications": "^7.15.0",
+    "@tabler/icons-react": "^3.26.0",
+    "@tanstack/react-query": "^5.62.8",
+    "axios": "^1.7.9",
+    "dayjs": "^1.11.13",
+    "embla-carousel-react": "^8.5.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.15.0",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "postcss": "^8.4.49",
+    "postcss-preset-mantine": "^1.17.0",
+    "postcss-simple-vars": "^7.0.1",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.5"
+  }
+}
