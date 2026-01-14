@@ -18,24 +18,48 @@ const queryClient = new QueryClient({
 })
 
 const theme = createTheme({
-  primaryColor: 'red',
+  primaryColor: 'inky-navy',
   colors: {
-    red: [
-      '#fff0f0',
-      '#ffe0e0',
-      '#ffb8b8',
-      '#ff8d8d',
-      '#ff6969',
-      '#ff5757',
-      '#ff4545',
-      '#e63939',
-      '#cc2d2d',
-      '#b32020',
+    'inky-navy': [
+      '#e8eaf1',
+      '#c4cce0',
+      '#9faecf',
+      '#7a91bf',
+      '#5574af',
+      '#30579f',
+      '#1B2A5E', // Inky Navy
+      '#16234f',
+      '#111c40',
+      '#0c1431',
+    ],
+    'inky-red': [
+      '#ffebeb',
+      '#ffc2c2',
+      '#ff9999',
+      '#ff7070',
+      '#FF4A4A', // Inky Red
+      '#f03d3d',
+      '#d62a2a',
+      '#bc1717',
+      '#a20404',
+      '#880000',
+    ],
+    'inky-dark': [
+      '#e7e8ec',
+      '#c2c5d6',
+      '#9da2be',
+      '#787fa6',
+      '#535c8e',
+      '#2e3976',
+      '#0F1941', // Inky Dark
+      '#0d163a',
+      '#0b1333',
+      '#09102c',
     ],
   },
-  fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+  fontFamily: 'Poppins, sans-serif',
   headings: {
-    fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+    fontFamily: 'Poppins, sans-serif',
   },
 })
 

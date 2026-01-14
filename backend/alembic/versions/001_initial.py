@@ -10,6 +10,7 @@ is for documentation purposes only. It should be marked as
 applied without running the upgrade.
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -17,7 +18,7 @@ import sqlalchemy as sa
 from pgvector.sqlalchemy import HALFVEC
 
 
-revision: str = '001'
+revision: str = "001"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

@@ -7,7 +7,16 @@ from typing import AsyncGenerator, List
 from unittest.mock import AsyncMock, MagicMock, patch
 from types import ModuleType
 
-from sqlalchemy import create_engine, event, Column, BigInteger, String, Date, Text, Index
+from sqlalchemy import (
+    create_engine,
+    event,
+    Column,
+    BigInteger,
+    String,
+    Date,
+    Text,
+    Index,
+)
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import StaticPool
@@ -24,6 +33,7 @@ TestBase = declarative_base()
 
 class Article(TestBase):
     """Test-specific Article model without PostgreSQL-specific columns."""
+
     __tablename__ = "articles"
 
     rowid = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -35,9 +45,7 @@ class Article(TestBase):
     tag = Column(String, nullable=True)
     link = Column(String, nullable=False)
 
-    __table_args__ = (
-        Index("articles_date_rowid_index", "date", "rowid"),
-    )
+    __table_args__ = (Index("articles_date_rowid_index", "date", "rowid"),)
 
     def to_dict(self):
         return {
@@ -53,7 +61,7 @@ class Article(TestBase):
 
 
 # Only mock during pytest runs (check if pytest is the main module)
-_is_pytest = "pytest" in sys.modules and hasattr(sys, '_called_from_test')
+_is_pytest = "pytest" in sys.modules and hasattr(sys, "_called_from_test")
 
 
 def pytest_configure(config):
@@ -68,7 +76,7 @@ def pytest_configure(config):
 
 def pytest_unconfigure(config):
     """Called after all tests complete."""
-    if hasattr(sys, '_called_from_test'):
+    if hasattr(sys, "_called_from_test"):
         del sys._called_from_test
 
 
@@ -82,6 +90,7 @@ def _get_app():
     if _app is None:
         from app.core.database import get_async_session as gas
         from app.main import app as main_app
+
         _app = main_app
         _get_async_session = gas
     return _app, _get_async_session
@@ -158,8 +167,7 @@ async def client(async_engine) -> AsyncGenerator[AsyncClient, None]:
     app.dependency_overrides[get_async_session] = override_get_async_session
 
     async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test"
+        transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:
         yield ac
 
@@ -173,16 +181,18 @@ def sample_articles() -> List[dict]:
     articles = []
 
     for i in range(30):
-        articles.append({
-            "rowid": i + 1,
-            "date": base_date + timedelta(days=i),
-            "archive": ["lemonde", "lesechos", "leparisien"][i % 3],
-            "image": f"/images/article_{i}.jpg" if i % 2 == 0 else None,
-            "title": f"Test Article {i + 1}",
-            "content": f"This is the content of test article {i + 1}. It contains some text for testing purposes.",
-            "tag": ["Politics", "Economy", "Sports", "Technology"][i % 4],
-            "link": f"https://example.com/article/{i + 1}",
-        })
+        articles.append(
+            {
+                "rowid": i + 1,
+                "date": base_date + timedelta(days=i),
+                "archive": ["lemonde", "lesechos", "leparisien"][i % 3],
+                "image": f"/images/article_{i}.jpg" if i % 2 == 0 else None,
+                "title": f"Test Article {i + 1}",
+                "content": f"This is the content of test article {i + 1}. It contains some text for testing purposes.",
+                "tag": ["Politics", "Economy", "Sports", "Technology"][i % 4],
+                "link": f"https://example.com/article/{i + 1}",
+            }
+        )
 
     return articles
 

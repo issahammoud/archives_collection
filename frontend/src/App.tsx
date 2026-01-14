@@ -1,15 +1,16 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { AppShell, Box, Text } from '@mantine/core'
+import { AppShell, Box, ActionIcon } from '@mantine/core'
+import { IconChevronRight } from '@tabler/icons-react'
 import Header from './components/Header'
 import Sidebar from './components/Sidebar'
 import MainContent from './components/MainContent'
-import SidebarToggle from './components/SidebarToggle'
 import { useStore } from './store'
 import { articlesApi } from './api'
 
 function App() {
-  const { setFilters, drawerOpen } = useStore()
+  const { setFilters } = useStore()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const { data: dateRange } = useQuery({
     queryKey: ['dateRange'],
@@ -26,50 +27,74 @@ function App() {
   }, [dateRange, setFilters])
 
   return (
-    <AppShell header={{ height: 100 }} padding={0}>
+    <AppShell header={{ height: 80 }} padding="md">
       <AppShell.Header withBorder>
         <Header />
       </AppShell.Header>
 
-      <AppShell.Main>
-        <Box style={{ display: 'flex', minHeight: 'calc(100vh - 100px)', position: 'relative' }}>
+      <AppShell.Main bg="#f9fafb">
+        <Box style={{ position: 'relative' }}>
           <Box
+            onMouseEnter={() => setSidebarOpen(true)}
+            onMouseLeave={() => setSidebarOpen(false)}
             style={{
-              width: drawerOpen ? '15%' : 0,
-              minWidth: drawerOpen ? 200 : 0,
-              maxWidth: drawerOpen ? 280 : 0,
-              backgroundColor: 'white',
-              padding: drawerOpen ? 'var(--mantine-spacing-md)' : 0,
-              overflowY: 'auto',
-              overflowX: 'hidden',
-              transition: 'all 300ms ease',
-              boxShadow: drawerOpen ? '2px 0 8px rgba(0,0,0,0.05)' : 'none',
+              position: 'absolute',
+              top: 0,
+              left: -16,
+              bottom: 0,
+              width: 'var(--mantine-spacing-xl)',
+              zIndex: 300,
             }}
           >
-            {drawerOpen && <Sidebar />}
+            <ActionIcon
+              variant="transparent"
+              color="gray"
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                opacity: sidebarOpen ? 0 : 1,
+                transition: 'opacity 300ms ease',
+              }}
+            >
+              <IconChevronRight />
+            </ActionIcon>
           </Box>
 
-          <SidebarToggle />
+          <Box
+            component="aside"
+            onMouseEnter={() => setSidebarOpen(true)}
+            onMouseLeave={() => setSidebarOpen(false)}
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              width: 300,
+              backgroundColor: 'white',
+              padding: 'var(--mantine-spacing-md)',
+              borderRadius: 'var(--mantine-radius-md)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+              transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+              transition: 'transform 300ms ease',
+              zIndex: 200,
+            }}
+          >
+            <Sidebar />
+          </Box>
 
           <Box
+            component="main"
             style={{
               flex: 1,
-              padding: 'var(--mantine-spacing-xl)',
-              transition: 'all 300ms ease',
+              marginLeft: sidebarOpen ? 340 : 0,
+              transform: sidebarOpen ? 'scale(0.9)' : 'scale(1)',
+              transformOrigin: 'left center',
+              transition: 'margin-left 300ms ease, transform 300ms ease',
             }}
           >
             <MainContent />
           </Box>
-        </Box>
-
-        <Box
-          component="footer"
-          py="md"
-          px="xl"
-        >
-          <Text ta="center" size="sm">
-            &copy; Copyright Intuitive Deep Learning {new Date().getFullYear()}.
-          </Text>
         </Box>
       </AppShell.Main>
     </AppShell>

@@ -61,3 +61,13 @@ onnx/
 !.env.template
 
 *csv
+
+# Frontend specific ignores
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env.local
+
+# OS and IDE specific ignores
+.DS_Store
+.vscode/

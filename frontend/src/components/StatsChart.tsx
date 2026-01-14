@@ -57,8 +57,8 @@ function StatsChart({ data, reversed = false }: StatsChartProps) {
           />
           <Bar
             dataKey="count"
-            fill="#0097b2"
-            radius={[2, 2, 0, 0]}
+            fill="var(--mantine-color-inky-navy-5)"
+            radius={[4, 4, 0, 0]}
           />
         </BarChart>
       </ResponsiveContainer>

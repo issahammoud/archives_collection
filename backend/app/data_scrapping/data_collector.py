@@ -56,8 +56,14 @@ def get_embeddings(batch, embedding_url, timeout=20):
     data = []
     for el in batch:
         text = ""
-        text += f"title: {el.get(DBCOLUMNS.title, '')}\n" if el.get(DBCOLUMNS.title) else ""
-        text += f"content: {el.get(DBCOLUMNS.content, '')}\n" if el.get(DBCOLUMNS.content) else ""
+        text += (
+            f"title: {el.get(DBCOLUMNS.title, '')}\n" if el.get(DBCOLUMNS.title) else ""
+        )
+        text += (
+            f"content: {el.get(DBCOLUMNS.content, '')}\n"
+            if el.get(DBCOLUMNS.content)
+            else ""
+        )
         text += f"topic: {el.get(DBCOLUMNS.tag, '')}" if el.get(DBCOLUMNS.tag) else ""
         data.append(text)
 
@@ -175,7 +181,9 @@ class DataCollector(ABC):
         embeddings = get_embeddings(data_list, self._embedding_url)
         if embeddings is not None:
             for data, emb in zip(data_list, embeddings):
-                data[DBCOLUMNS.embedding] = emb.tolist() if hasattr(emb, 'tolist') else emb
+                data[DBCOLUMNS.embedding] = (
+                    emb.tolist() if hasattr(emb, "tolist") else emb
+                )
                 list_.append(data)
 
             rowscount = db_manager.insert_rows("articles", list_)

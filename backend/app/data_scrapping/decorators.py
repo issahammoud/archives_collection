@@ -96,15 +96,13 @@ class RemoveDoneDates(Decorator):
         table_ref = Table("articles", metadata, autoload_with=engine)
 
         with engine.connect() as conn:
-            query = select(
-                table_ref.c.date.label("date"), func.count().label("freq")
-            ).where(
-                table_ref.c.archive == self._collector.archive
-            ).where(
-                table_ref.c.date >= self._collector.begin_date
-            ).where(
-                table_ref.c.date <= self._collector.end_date
-            ).group_by(table_ref.c.date)
+            query = (
+                select(table_ref.c.date.label("date"), func.count().label("freq"))
+                .where(table_ref.c.archive == self._collector.archive)
+                .where(table_ref.c.date >= self._collector.begin_date)
+                .where(table_ref.c.date <= self._collector.end_date)
+                .group_by(table_ref.c.date)
+            )
 
             date_counts = query.cte("date_counts")
 
@@ -151,12 +149,11 @@ class RemoveDoneDates(Decorator):
             table_ref = Table("articles", metadata, autoload_with=engine)
 
             with engine.connect() as conn:
-                query = select(table_ref.c.link).where(
-                    table_ref.c.archive == self._collector.archive
-                ).where(
-                    table_ref.c.date >= self._collector.begin_date
-                ).where(
-                    table_ref.c.date <= self._collector.end_date
+                query = (
+                    select(table_ref.c.link)
+                    .where(table_ref.c.archive == self._collector.archive)
+                    .where(table_ref.c.date >= self._collector.begin_date)
+                    .where(table_ref.c.date <= self._collector.end_date)
                 )
 
                 result = conn.execute(query)

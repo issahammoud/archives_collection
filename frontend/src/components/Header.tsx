@@ -1,16 +1,20 @@
-import { Container, Image } from '@mantine/core'
+import { Container, Group, Stack, Text } from '@mantine/core'
+import { IconNews } from '@tabler/icons-react'
 
 function Header() {
   return (
-    <Container size="xl" h="100%" py="md">
-      <Image
-        src="/logo.png"
-        alt="Logo"
-        h={80}
-        w="auto"
-        fit="contain"
-        fallbackSrc=""
-      />
+    <Container size="xl" h="100%" style={{ display: 'flex', alignItems: 'center' }}>
+      <Group>
+        <IconNews size={50} color="var(--mantine-color-inky-red-4)" />
+        <Stack gap={0}>
+          <Text size="lg" fw={600} c="inky-navy.6">
+            News DB
+          </Text>
+          <Text size="xs" c="inky-navy.6">
+            By InkyLab AI
+          </Text>
+        </Stack>
+      </Group>
     </Container>
   )
 }

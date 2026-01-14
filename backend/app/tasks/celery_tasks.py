@@ -71,26 +71,30 @@ def download_task(columns, filters, order):
                         text("SET LOCAL hnsw.ef_search = :ef_val"),
                         {"ef_val": settings.HNSW_EF_SEARCH},
                     )
-                    conn.execute(
-                        text("SET LOCAL hnsw.iterative_scan = relaxed_order")
-                    )
+                    conn.execute(text("SET LOCAL hnsw.iterative_scan = relaxed_order"))
 
                     query = select(*[table_ref.c[c] for c in columns_to_select])
 
                     if last_seen:
-                        last_date = last_seen.get(DBCOLUMNS.date) or last_seen.get("date")
-                        last_rowid = last_seen.get(DBCOLUMNS.rowid) or last_seen.get("rowid")
+                        last_date = last_seen.get(DBCOLUMNS.date) or last_seen.get(
+                            "date"
+                        )
+                        last_rowid = last_seen.get(DBCOLUMNS.rowid) or last_seen.get(
+                            "rowid"
+                        )
 
                         if isinstance(last_date, str):
                             last_date = date.fromisoformat(last_date)
 
                         if order:
                             query = query.where(
-                                tuple_(table_ref.c.date, table_ref.c.rowid) < (last_date, last_rowid)
+                                tuple_(table_ref.c.date, table_ref.c.rowid)
+                                < (last_date, last_rowid)
                             )
                         else:
                             query = query.where(
-                                tuple_(table_ref.c.date, table_ref.c.rowid) > (last_date, last_rowid)
+                                tuple_(table_ref.c.date, table_ref.c.rowid)
+                                > (last_date, last_rowid)
                             )
 
                     if order:
@@ -110,7 +114,11 @@ def download_task(columns, filters, order):
                 break
 
             last_seen = {
-                DBCOLUMNS.date: rows[-1][1].isoformat() if hasattr(rows[-1][1], 'isoformat') else rows[-1][1],
+                DBCOLUMNS.date: (
+                    rows[-1][1].isoformat()
+                    if hasattr(rows[-1][1], "isoformat")
+                    else rows[-1][1]
+                ),
                 DBCOLUMNS.rowid: rows[-1][0],
             }
 

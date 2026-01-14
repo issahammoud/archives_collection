@@ -1,4 +1,5 @@
 """Synchronous database manager for Celery tasks and data scraping."""
+
 import logging
 from sqlalchemy import create_engine, MetaData, Table, func, select, inspect
 from sqlalchemy.dialects.postgresql import insert

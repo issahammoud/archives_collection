@@ -117,7 +117,7 @@ function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
               style={{
                 flex: '0 0 100%',
                 minWidth: 0,
-                paddingRight: 16,
+                paddingRight: 'var(--mantine-spacing-md)',
               }}
             >
               <SimpleGrid cols={3} spacing="md">
@@ -132,9 +132,9 @@ function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
 
       <ActionIcon
         variant="filled"
-        color="gray.1"
+        color="inky-red.4"
         radius="xl"
-        size="xl"
+        size="lg"
         onClick={scrollPrev}
         disabled={!canScrollPrev && !lastSeen?.backward}
         pos="absolute"
@@ -142,20 +142,19 @@ function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
         top="50%"
         style={{
           transform: 'translateY(-50%)',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
           opacity: isHovered && (canScrollPrev || lastSeen?.backward) ? 1 : 0,
           transition: 'opacity 200ms ease',
           pointerEvents: isHovered ? 'auto' : 'none',
         }}
       >
-        <IconChevronLeft size={24} color="#0097b2" />
+        <IconChevronLeft size={20} />
       </ActionIcon>
 
       <ActionIcon
         variant="filled"
-        color="gray.1"
+        color="inky-red.4"
         radius="xl"
-        size="xl"
+        size="lg"
         onClick={scrollNext}
         disabled={!canScrollNext && !lastSeen?.forward}
         pos="absolute"
@@ -163,27 +162,35 @@ function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
         top="50%"
         style={{
           transform: 'translateY(-50%)',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
           opacity: isHovered && (canScrollNext || lastSeen?.forward) ? 1 : 0,
           transition: 'opacity 200ms ease',
           pointerEvents: isHovered ? 'auto' : 'none',
         }}
       >
-        <IconChevronRight size={24} color="#0097b2" />
+        <IconChevronRight size={20} />
       </ActionIcon>
 
-      <Group justify="center" gap={8} mt="xl">
+      <Group
+        justify="center"
+        gap={8}
+        style={{
+          position: 'absolute',
+          bottom: -20,
+          left: '50%',
+          transform: 'translateX(-50%)',
+        }}
+      >
         {Array.from({ length: totalPages }).map((_, index) => (
           <Box
             key={index}
             onClick={() => emblaApi?.scrollTo(index)}
             style={{
-              width: 10,
-              height: 10,
+              width: 8,
+              height: 8,
               borderRadius: '50%',
               backgroundColor:
                 index === selectedIndex
-                  ? '#0097b2'
+                  ? 'var(--mantine-color-inky-red-4)'
                   : 'var(--mantine-color-gray-3)',
               cursor: 'pointer',
               transition: 'background-color 150ms ease',

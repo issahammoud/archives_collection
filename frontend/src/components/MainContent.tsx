@@ -6,12 +6,10 @@ import {
   Center,
   Text,
   Loader,
-  ActionIcon,
   Paper,
   Stack,
   Container,
 } from '@mantine/core'
-import { IconDownload } from '@tabler/icons-react'
 import { useStore } from '../store'
 import { articlesApi, tasksApi } from '../api'
 import Carousel from './Carousel'
@@ -27,10 +25,6 @@ function MainContent() {
     setArticles,
     setTotalCount,
     setLastSeen,
-    downloadTaskId,
-    setDownloadTaskId,
-    isDownloading,
-    setIsDownloading,
   } = useStore()
 
   const { data, isLoading, refetch } = useQuery({
@@ -72,53 +66,6 @@ function MainContent() {
     return () => clearInterval(interval)
   }, [refetch])
 
-  const downloadMutation = useMutation({
-    mutationFn: () => tasksApi.startDownload(filters, filters.descOrder),
-    onSuccess: (data) => {
-      setDownloadTaskId(data.task_id)
-      setIsDownloading(true)
-      notifications.show({
-        title: 'Success',
-        message: 'Download started!',
-        color: 'green',
-      })
-    },
-    onError: () => {
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to start download',
-        color: 'red',
-      })
-    },
-  })
-
-  useEffect(() => {
-    if (!isDownloading || !downloadTaskId) return
-
-    const interval = setInterval(async () => {
-      try {
-        const status = await tasksApi.getDownloadStatus(downloadTaskId)
-        if (status.status === 'SUCCESS') {
-          setIsDownloading(false)
-          setDownloadTaskId(null)
-          window.location.href = '/api/v1/tasks/download/file'
-        } else if (['FAILURE', 'REVOKED'].includes(status.status)) {
-          setIsDownloading(false)
-          setDownloadTaskId(null)
-          notifications.show({
-            title: 'Error',
-            message: 'Download failed',
-            color: 'red',
-          })
-        }
-      } catch {
-        // Ignore polling errors
-      }
-    }, 2000)
-
-    return () => clearInterval(interval)
-  }, [isDownloading, downloadTaskId, setIsDownloading, setDownloadTaskId])
-
   if (!filters.dateStart || !filters.dateEnd) {
     return (
       <Center h={400}>
@@ -153,22 +100,8 @@ function MainContent() {
   }
 
   return (
-    <Box maw={1200} mx="auto">
-      <Box pos="relative" mb="md">
-        <ActionIcon
-          pos="absolute"
-          top={0}
-          right={0}
-          variant="subtle"
-          color="red"
-          onClick={() => downloadMutation.mutate()}
-          disabled={isDownloading}
-          title="Download data"
-          size="lg"
-        >
-          <IconDownload size={20} />
-        </ActionIcon>
-
+    <Box maw="90vw" mx="auto" px="md">
+      <Box pos="relative" mb="xl">
         {groupByData && (
           <StatsChart data={groupByData.data} reversed={!filters.descOrder} />
         )}

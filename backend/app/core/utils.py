@@ -93,9 +93,7 @@ async def get_embeddings_async(batch: list, timeout: int = 20) -> np.ndarray | N
 
     try:
         async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                settings.EMBED_URL, json=payload, timeout=timeout
-            )
+            resp = await client.post(settings.EMBED_URL, json=payload, timeout=timeout)
             resp.raise_for_status()
             data = orjson.loads(resp.content)
             embeddings = np.array(data["embeddings"])

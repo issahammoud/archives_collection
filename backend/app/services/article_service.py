@@ -43,10 +43,8 @@ class ArticleService:
                 elif column == DBCOLUMNS.text_searchable:
                     if operator == OPERATORS.ts:
                         # Full-text search using to_tsquery
-                        ts_query = func.plainto_tsquery('french', func.unaccent(value))
-                        query = query.where(
-                            Article.text_searchable.op('@@')(ts_query)
-                        )
+                        ts_query = func.plainto_tsquery("french", func.unaccent(value))
+                        query = query.where(Article.text_searchable.op("@@")(ts_query))
 
         return query
 
@@ -74,7 +72,9 @@ class ArticleService:
                         params[f"tag_{param_idx}"] = f"%{value.upper()}%"
                 elif column == DBCOLUMNS.archive:
                     if operator == OPERATORS.in_:
-                        placeholders = ", ".join(f":archive_{param_idx}_{i}" for i in range(len(value)))
+                        placeholders = ", ".join(
+                            f":archive_{param_idx}_{i}" for i in range(len(value))
+                        )
                         clauses.append(f"archive IN ({placeholders})")
                         for i, v in enumerate(value):
                             params[f"archive_{param_idx}_{i}"] = v
@@ -83,7 +83,9 @@ class ArticleService:
                         clauses.append("image IS NOT NULL AND image != ''")
                 elif column == DBCOLUMNS.text_searchable:
                     if operator == OPERATORS.ts:
-                        clauses.append(f"text_searchable @@ plainto_tsquery('french', unaccent(:query_{param_idx}))")
+                        clauses.append(
+                            f"text_searchable @@ plainto_tsquery('french', unaccent(:query_{param_idx}))"
+                        )
                         params[f"query_{param_idx}"] = value
                 param_idx += 1
 
@@ -113,8 +115,10 @@ class ArticleService:
         columns: Optional[List[str]] = None,
     ) -> List[dict]:
         try:
-            logger.info(f"fetch_data_keyset: direction={direction}, desc_order={desc_order}, "
-                       f"last_seen_date={last_seen_date}, last_seen_rowid={last_seen_rowid}")
+            logger.info(
+                f"fetch_data_keyset: direction={direction}, desc_order={desc_order}, "
+                f"last_seen_date={last_seen_date}, last_seen_rowid={last_seen_rowid}"
+            )
 
             query = select(Article)
             query = self._apply_filters(query, filters)
@@ -129,7 +133,10 @@ class ArticleService:
                     query = query.where(
                         or_(
                             Article.date < last_seen_date,
-                            and_(Article.date == last_seen_date, Article.rowid < last_seen_rowid)
+                            and_(
+                                Article.date == last_seen_date,
+                                Article.rowid < last_seen_rowid,
+                            ),
                         )
                     )
                 else:
@@ -137,7 +144,10 @@ class ArticleService:
                     query = query.where(
                         or_(
                             Article.date > last_seen_date,
-                            and_(Article.date == last_seen_date, Article.rowid > last_seen_rowid)
+                            and_(
+                                Article.date == last_seen_date,
+                                Article.rowid > last_seen_rowid,
+                            ),
                         )
                     )
 
@@ -159,16 +169,18 @@ class ArticleService:
 
             articles = []
             for row in rows:
-                articles.append({
-                    "rowid": row.rowid,
-                    "date": row.date.isoformat() if row.date else None,
-                    "archive": row.archive,
-                    "image": row.image,
-                    "title": row.title,
-                    "content": row.content,
-                    "tag": row.tag,
-                    "link": row.link,
-                })
+                articles.append(
+                    {
+                        "rowid": row.rowid,
+                        "date": row.date.isoformat() if row.date else None,
+                        "archive": row.archive,
+                        "image": row.image,
+                        "title": row.title,
+                        "content": row.content,
+                        "tag": row.tag,
+                        "link": row.link,
+                    }
+                )
 
             return articles
         except Exception as e:
@@ -183,13 +195,15 @@ class ArticleService:
             where_clause, params = self._build_filter_sql(filters)
             where_sql = f"WHERE {where_clause}" if where_clause else ""
 
-            query = text(f"""
+            query = text(
+                f"""
                 SELECT date_trunc(:interval, date) as period, count(*) as count
                 FROM articles
                 {where_sql}
                 GROUP BY period
                 ORDER BY period
-            """)
+            """
+            )
 
             params["interval"] = value
             result = await self.session.execute(query, params)

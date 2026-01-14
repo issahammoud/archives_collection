@@ -11,10 +11,7 @@ interface AppState {
     backward: { date: string; rowid: number }
   } | null
   currentSlide: number
-  drawerOpen: boolean
-  collectionTaskId: string | null
   downloadTaskId: string | null
-  isCollecting: boolean
   isDownloading: boolean
 
   setFilters: (filters: Partial<FilterState>) => void
@@ -28,10 +25,7 @@ interface AppState {
     } | null
   ) => void
   setCurrentSlide: (slide: number) => void
-  toggleDrawer: () => void
-  setCollectionTaskId: (taskId: string | null) => void
   setDownloadTaskId: (taskId: string | null) => void
-  setIsCollecting: (isCollecting: boolean) => void
   setIsDownloading: (isDownloading: boolean) => void
   resetPagination: () => void
 }
@@ -56,10 +50,7 @@ export const useStore = create<AppState>((set) => ({
   totalCount: 0,
   lastSeen: null,
   currentSlide: 0,
-  drawerOpen: true,
-  collectionTaskId: null,
   downloadTaskId: null,
-  isCollecting: false,
   isDownloading: false,
 
   setFilters: (newFilters) =>
@@ -80,13 +71,7 @@ export const useStore = create<AppState>((set) => ({
 
   setCurrentSlide: (slide) => set({ currentSlide: slide }),
 
-  toggleDrawer: () => set((state) => ({ drawerOpen: !state.drawerOpen })),
-
-  setCollectionTaskId: (taskId) => set({ collectionTaskId: taskId }),
-
   setDownloadTaskId: (taskId) => set({ downloadTaskId: taskId }),
-
-  setIsCollecting: (isCollecting) => set({ isCollecting }),
 
   setIsDownloading: (isDownloading) => set({ isDownloading }),
 

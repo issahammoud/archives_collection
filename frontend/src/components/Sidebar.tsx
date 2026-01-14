@@ -16,8 +16,6 @@ import {
 } from '@mantine/core'
 import { DatePickerInput } from '@mantine/dates'
 import {
-  IconPlayerPlay,
-  IconPlayerStop,
   IconArrowsSort,
   IconPhotoOff,
   IconChartBar,
@@ -31,18 +29,15 @@ import { useStore } from '../store'
 import { articlesApi, tasksApi } from '../api'
 import dayjs from 'dayjs'
 
-const ACCENT_COLOR = '#ff5757'
-const ICON_COLOR = '#0097b2'
-
 function Sidebar() {
   const {
     filters,
     setFilters,
     totalCount,
-    collectionTaskId,
-    setCollectionTaskId,
-    isCollecting,
-    setIsCollecting,
+    downloadTaskId,
+    setDownloadTaskId,
+    isDownloading,
+    setIsDownloading,
     resetPagination,
   } = useStore()
 
@@ -63,54 +58,52 @@ function Sidebar() {
     queryFn: articlesApi.getDateRange,
   })
 
-  const startCollectionMutation = useMutation({
-    mutationFn: () =>
-      tasksApi.startCollection(
-        filters.archives.length > 0 ? filters.archives : null,
-        filters.dateStart || '',
-        filters.dateEnd || ''
-      ),
+  const downloadMutation = useMutation({
+    mutationFn: () => tasksApi.startDownload(filters, filters.descOrder),
     onSuccess: (data) => {
-      setCollectionTaskId(data.task_id)
-      setIsCollecting(true)
+      setDownloadTaskId(data.task_id)
+      setIsDownloading(true)
       notifications.show({
-        title: 'Collection Started',
-        message: 'The data collection started. The interface will be updated each 5 seconds.',
-        color: ACCENT_COLOR,
+        title: 'Success',
+        message: 'Download started!',
+        color: 'inky-navy',
       })
     },
-  })
-
-  const stopCollectionMutation = useMutation({
-    mutationFn: () => tasksApi.stopCollection(collectionTaskId || ''),
-    onSuccess: () => {
-      setCollectionTaskId(null)
-      setIsCollecting(false)
+    onError: () => {
       notifications.show({
-        title: 'Collection Stopped',
-        message: 'Collection stopped',
-        color: ACCENT_COLOR,
+        title: 'Error',
+        message: 'Failed to start download',
+        color: 'inky-red.4',
       })
     },
   })
 
   useEffect(() => {
-    if (!isCollecting || !collectionTaskId) return
+    if (!isDownloading || !downloadTaskId) return
 
     const interval = setInterval(async () => {
       try {
-        const status = await tasksApi.getCollectionStatus(collectionTaskId)
-        if (['SUCCESS', 'FAILURE', 'REVOKED'].includes(status.status)) {
-          setIsCollecting(false)
-          setCollectionTaskId(null)
+        const status = await tasksApi.getDownloadStatus(downloadTaskId)
+        if (status.status === 'SUCCESS') {
+          setIsDownloading(false)
+          setDownloadTaskId(null)
+          window.location.href = '/api/v1/tasks/download/file'
+        } else if (['FAILURE', 'REVOKED'].includes(status.status)) {
+          setIsDownloading(false)
+          setDownloadTaskId(null)
+          notifications.show({
+            title: 'Error',
+            message: 'Download failed',
+            color: 'inky-red.4',
+          })
         }
       } catch {
         // Ignore polling errors
       }
-    }, 5000)
+    }, 2000)
 
     return () => clearInterval(interval)
-  }, [isCollecting, collectionTaskId, setIsCollecting, setCollectionTaskId])
+  }, [isDownloading, downloadTaskId, setIsDownloading, setDownloadTaskId])
 
   const handleSearch = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -129,65 +122,42 @@ function Sidebar() {
   }
 
   return (
-    <Stack gap="sm">
-      {/* Control buttons */}
-      <Group justify="space-between">
-        <Tooltip label={`${totalCount} articles`} withArrow position="top">
-          <Badge
-            size="xl"
-            variant="light"
-            color={ACCENT_COLOR}
-            radius="xl"
-            circle
-            p={2}
-          >
-            <Text fw={300} size="xs">{formatCount(totalCount)}</Text>
-          </Badge>
-        </Tooltip>
-        <Tooltip label="Start Collection" withArrow position="top">
-          <ActionIcon
-            variant="subtle"
-            color={ACCENT_COLOR}
-            onClick={() => startCollectionMutation.mutate()}
-            disabled={isCollecting}
-          >
-            <IconPlayerPlay size={20} />
-          </ActionIcon>
-        </Tooltip>
-        <Tooltip label="Stop Collection" withArrow position="top">
-          <ActionIcon
-            variant="subtle"
-            color={ACCENT_COLOR}
-            onClick={() => stopCollectionMutation.mutate()}
-            disabled={!isCollecting}
-          >
-            <IconPlayerStop size={20} />
-          </ActionIcon>
-        </Tooltip>
-      </Group>
+    <Stack gap="xl">
+      <Badge
+        size="xl"
+        variant="filled"
+        color="gray.0"
+        radius="sm"
+        fullWidth
+        c="inky-navy.6"
+      >
+        {`${formatCount(totalCount)} articles`}
+      </Badge>
 
       {/* Switches */}
-      <Group justify="space-between">
+      <Group justify="space-between" gap="sm">
         <Tooltip label="Flip order" withArrow position="top">
           <ActionIcon
-            variant="subtle"
-            color={ACCENT_COLOR}
+            variant="light"
+            color="inky-red.4"
             onClick={() => {
               setFilters({ descOrder: !filters.descOrder })
               resetPagination()
             }}
+            size="lg"
           >
             <IconArrowsSort size={20} />
           </ActionIcon>
         </Tooltip>
         <Tooltip label="Filter images" withArrow position="top">
           <ActionIcon
-            variant={filters.hasImage ? 'filled' : 'subtle'}
-            color={ACCENT_COLOR}
+            variant={filters.hasImage ? 'filled' : 'light'}
+            color="inky-red.4"
             onClick={() => {
               setFilters({ hasImage: !filters.hasImage })
               resetPagination()
             }}
+            size="lg"
           >
             <IconPhotoOff size={20} />
           </ActionIcon>
@@ -195,7 +165,7 @@ function Sidebar() {
         <Popover position="bottom" withArrow shadow="md">
           <Popover.Target>
             <Tooltip label="Group by" withArrow position="top">
-              <ActionIcon variant="subtle" color={ACCENT_COLOR}>
+              <ActionIcon variant="light" color="inky-red.4" size="lg">
                 <IconChartBar size={20} />
               </ActionIcon>
             </Tooltip>
@@ -214,12 +184,24 @@ function Sidebar() {
             </Radio.Group>
           </Popover.Dropdown>
         </Popover>
+        <Tooltip label="Download data" withArrow position="top">
+          <ActionIcon
+            variant="light"
+            color="inky-red.4"
+            onClick={() => downloadMutation.mutate()}
+            disabled={isDownloading}
+            size="lg"
+          >
+            <IconDownload size={20} />
+          </ActionIcon>
+        </Tooltip>
       </Group>
 
       {/* Date picker */}
       <DatePickerInput
         type="range"
-        label={<Text c="dimmed" fw={300}>Date</Text>}
+        label={<Text c="inky-navy.6">Date Range</Text>}
+        placeholder="Select dates"
         value={[
           filters.dateStart ? dayjs(filters.dateStart).toDate() : null,
           filters.dateEnd ? dayjs(filters.dateEnd).toDate() : null,
@@ -234,15 +216,15 @@ function Sidebar() {
         minDate={dateRange?.min_date ? dayjs(dateRange.min_date).toDate() : undefined}
         maxDate={dateRange?.max_date ? dayjs(dateRange.max_date).toDate() : undefined}
         valueFormat="DD/MM/YYYY"
-        leftSection={<IconCalendar size={16} color={ICON_COLOR} />}
-        variant="unstyled"
+        leftSection={<IconCalendar size={16} />}
+        variant="default"
+        radius="md"
         clearable={false}
-        styles={{ input: { borderBottom: '1px solid #eee' } }}
       />
 
       {/* Topic select */}
       <Select
-        label={<Text c="dimmed" fw={300}>Topic</Text>}
+        label={<Text c="inky-navy.6">Topic</Text>}
         placeholder="Search by topic"
         value={filters.tag}
         onChange={(value) => {
@@ -252,27 +234,27 @@ function Sidebar() {
         data={tagsData?.tags.map((tag) => ({ value: tag, label: tag })) || []}
         clearable
         searchable
-        leftSection={<IconTag size={16} color={ICON_COLOR} />}
-        variant="unstyled"
-        styles={{ input: { borderBottom: '1px solid #eee' } }}
+        leftSection={<IconTag size={16} />}
+        variant="default"
+        radius="md"
         comboboxProps={{ transitionProps: { transition: 'pop', duration: 200 } }}
       />
 
       {/* Text search */}
       <TextInput
-        label={<Text c="dimmed" fw={300}>Text</Text>}
+        label={<Text c="inky-navy.6">Text</Text>}
         placeholder="Search by text"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         onKeyDown={handleSearch}
-        leftSection={<IconSearch size={16} color={ICON_COLOR} />}
-        variant="unstyled"
-        styles={{ input: { borderBottom: '1px solid #eee' } }}
+        leftSection={<IconSearch size={16} />}
+        variant="default"
+        radius="md"
       />
 
       {/* Archives multi-select */}
       <MultiSelect
-        label={<Text c="dimmed" fw={300}>Archive</Text>}
+        label={<Text c="inky-navy.6">Archive</Text>}
         placeholder="Search by archive"
         value={filters.archives}
         onChange={(value) => {
@@ -283,9 +265,9 @@ function Sidebar() {
         clearable
         searchable
         hidePickedOptions
-        leftSection={<IconBook size={16} color={ICON_COLOR} />}
-        variant="unstyled"
-        styles={{ input: { borderBottom: '1px solid #eee' } }}
+        leftSection={<IconBook size={16} />}
+        variant="default"
+        radius="md"
         comboboxProps={{ transitionProps: { transition: 'pop', duration: 200 } }}
       />
     </Stack>
