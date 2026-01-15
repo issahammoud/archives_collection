@@ -254,3 +254,27 @@ class ArticleService:
         except Exception as e:
             logger.error(f"Error in get_min_max_dates: {e}", exc_info=True)
             return None, None
+
+    async def get_archive_counts(self, filters: Optional[dict] = None) -> List[dict]:
+        """Get article counts per archive with optional filters."""
+        try:
+            where_clause, params = self._build_filter_sql(filters)
+            where_sql = f"WHERE {where_clause}" if where_clause else ""
+
+            query = text(
+                f"""
+                SELECT archive, count(*) as count
+                FROM articles
+                {where_sql}
+                GROUP BY archive
+                ORDER BY count DESC
+            """
+            )
+
+            result = await self.session.execute(query, params)
+            rows = result.fetchall()
+
+            return [{"archive": row[0], "count": row[1]} for row in rows if row[0]]
+        except Exception as e:
+            logger.error(f"Error in get_archive_counts: {e}")
+            return []

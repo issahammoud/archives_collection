@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { notifications } from '@mantine/notifications'
+import { useQuery } from '@tanstack/react-query'
 import {
   Box,
   Center,
@@ -8,14 +7,12 @@ import {
   Loader,
   Paper,
   Stack,
-  Container,
 } from '@mantine/core'
 import { useStore } from '../store'
-import { articlesApi, tasksApi } from '../api'
+import { articlesApi } from '../api'
 import Carousel from './Carousel'
-import StatsChart from './StatsChart'
 
-const SLIDES_PER_PAGE = 3
+const SLIDES_PER_PAGE = 2
 const MAX_PAGES = 10
 
 function MainContent() {
@@ -31,12 +28,6 @@ function MainContent() {
     queryKey: ['articles', filters, pagination],
     queryFn: () =>
       articlesApi.getArticles(filters, pagination, SLIDES_PER_PAGE * MAX_PAGES),
-    enabled: !!filters.dateStart && !!filters.dateEnd,
-  })
-
-  const { data: groupByData } = useQuery({
-    queryKey: ['groupBy', filters, filters.groupBy],
-    queryFn: () => articlesApi.getGroupBy(filters, filters.groupBy),
     enabled: !!filters.dateStart && !!filters.dateEnd,
   })
 
@@ -100,13 +91,11 @@ function MainContent() {
   }
 
   return (
-    <Box maw="90vw" mx="auto" px="md">
-      <Box pos="relative" mb="xl">
-        {groupByData && (
-          <StatsChart data={groupByData.data} reversed={!filters.descOrder} />
-        )}
-      </Box>
-
+    <Box
+      p="lg"
+      h="100%"
+      style={{ borderRadius: 'var(--mantine-radius-md)' }}
+    >
       <Carousel
         articles={data.articles}
         slidesPerPage={SLIDES_PER_PAGE}

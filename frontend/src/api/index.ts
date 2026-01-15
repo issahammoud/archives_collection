@@ -2,6 +2,7 @@ import axios from 'axios'
 import type {
   ArticlesResponse,
   GroupByResponse,
+  ArchiveCountsResponse,
   TagsResponse,
   DateRangeResponse,
   TaskResponse,
@@ -91,6 +92,22 @@ export const articlesApi = {
 
   getArchives: async (): Promise<{ archives: string[] }> => {
     const { data } = await api.get<{ archives: string[] }>('/articles/archives')
+    return data
+  },
+
+  getArchiveCounts: async (filters: FilterState): Promise<ArchiveCountsResponse> => {
+    const params = new URLSearchParams()
+
+    if (filters.archives.length > 0) {
+      filters.archives.forEach((a) => params.append('archives', a))
+    }
+    if (filters.tag) params.set('tag', filters.tag)
+    if (filters.dateStart) params.set('date_start', filters.dateStart)
+    if (filters.dateEnd) params.set('date_end', filters.dateEnd)
+    if (filters.query) params.set('query', filters.query)
+    if (filters.hasImage) params.set('has_image', 'true')
+
+    const { data } = await api.get<ArchiveCountsResponse>(`/articles/archive-counts?${params}`)
     return data
   },
 }

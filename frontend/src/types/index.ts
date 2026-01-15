@@ -27,6 +27,15 @@ export interface GroupByResponse {
   data: GroupByData[]
 }
 
+export interface ArchiveCountData {
+  archive: string
+  count: number
+}
+
+export interface ArchiveCountsResponse {
+  data: ArchiveCountData[]
+}
+
 export interface TagsResponse {
   tags: string[]
 }

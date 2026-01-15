@@ -67,6 +67,13 @@ frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 frontend/.env.local
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
+
+# Root level artifacts (should not exist)
+/package.json
+/package-lock.json
 
 # OS and IDE specific ignores
 .DS_Store

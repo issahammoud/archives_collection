@@ -120,7 +120,7 @@ function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
                 paddingRight: 'var(--mantine-spacing-md)',
               }}
             >
-              <SimpleGrid cols={3} spacing="md">
+              <SimpleGrid cols={slidesPerPage} spacing="lg">
                 {pageArticles.map((article) => (
                   <ArticleCard key={article.rowid} article={article} />
                 ))}

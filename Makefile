@@ -1,4 +1,4 @@
-.PHONY: all build run stop clean logs help dev test test-cov
+.PHONY: all build run stop clean logs help dev test test-cov collect collect-status collect-stop
 
 ifeq (, $(shell command -v nvidia-smi))
   DETECTED_GPU_MODE := NONE
@@ -92,6 +92,37 @@ test-cov:
 	@echo "-> Running backend tests with coverage..."
 	docker compose exec backend python -m pytest tests/ -v --cov=app --cov-report=term-missing
 
+# Collection commands
+# Usage: make collect BEGIN=2024-01-01 END=2024-01-31 [ARCHIVES='["lemonde","lesechos"]']
+BEGIN ?= $(shell date -d "yesterday" +%Y-%m-%d)
+END ?= $(shell date +%Y-%m-%d)
+ARCHIVES ?= null
+
+collect:
+	@echo "-> Starting collection from $(BEGIN) to $(END)..."
+	@curl -s -X POST "http://localhost:8000/api/v1/tasks/collection/start" \
+		-H "Content-Type: application/json" \
+		-d '{"archives": $(ARCHIVES), "begin_date": "$(BEGIN)", "end_date": "$(END)"}'
+	@echo ""
+
+collect-status:
+	@echo "-> Checking collection status..."
+	@if [ -z "$(TASK_ID)" ]; then \
+		echo "Error: TASK_ID is required. Usage: make collect-status TASK_ID=<task_id>"; \
+		exit 1; \
+	fi
+	@curl -s "http://localhost:8000/api/v1/tasks/collection/status/$(TASK_ID)"
+	@echo ""
+
+collect-stop:
+	@echo "-> Stopping collection..."
+	@if [ -z "$(TASK_ID)" ]; then \
+		echo "Error: TASK_ID is required. Usage: make collect-stop TASK_ID=<task_id>"; \
+		exit 1; \
+	fi
+	@curl -s -X POST "http://localhost:8000/api/v1/tasks/collection/stop?task_id=$(TASK_ID)"
+	@echo ""
+
 help:
 	@echo "Available commands:"
 	@echo "  make build [EMBEDDING_MODE=<gpu|none>] Build all services"
@@ -107,7 +138,20 @@ help:
 	@echo "  make shell-frontend                    Open shell in frontend container"
 	@echo "  make test                              Run backend tests"
 	@echo "  make test-cov                          Run backend tests with coverage"
+	@echo "  make collect                           Start data collection (see options below)"
+	@echo "  make collect-status TASK_ID=<id>       Check collection task status"
+	@echo "  make collect-stop TASK_ID=<id>         Stop a running collection task"
 	@echo "  make help                              Show this message"
+	@echo ""
+	@echo "Collection options:"
+	@echo "  BEGIN=YYYY-MM-DD                       Start date (default: yesterday)"
+	@echo "  END=YYYY-MM-DD                         End date (default: today)"
+	@echo "  ARCHIVES='[\"lemonde\",\"lesechos\"]'    JSON array of archives (default: all)"
+	@echo ""
+	@echo "Collection examples:"
+	@echo "  make collect                           Collect yesterday to today, all archives"
+	@echo "  make collect BEGIN=2024-01-01 END=2024-01-31"
+	@echo "  make collect ARCHIVES='[\"lemonde\"]' BEGIN=2024-06-01 END=2024-06-30"
 	@echo ""
 	@echo "Access points:"
 	@echo "  Frontend:   http://localhost:3000"

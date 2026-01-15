@@ -51,6 +51,10 @@ class GroupByResponse(BaseModel):
     data: List[dict]
 
 
+class ArchiveCountResponse(BaseModel):
+    data: List[dict]
+
+
 class TagsResponse(BaseModel):
     tags: List[str]
 

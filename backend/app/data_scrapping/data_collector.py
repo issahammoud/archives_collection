@@ -97,7 +97,7 @@ class DataCollector(ABC):
         self._translation_table = str.maketrans("éàèùâêîôûç", "eaeuaeiouc")
         self._fetch_strategy = StrategyFactory(self)
         self._data_dir = "/images/"
-        self._embedding_url = os.getenv("EMBED_URL")
+        self._embedding_url = settings.EMBED_URL
 
     def match_format(self, url):
         return bool(

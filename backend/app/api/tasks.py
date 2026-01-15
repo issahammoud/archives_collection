@@ -32,10 +32,13 @@ async def start_collection(request: CollectionRequest):
         )
 
         return TaskResponse(
-            task_id=task.id,
+            task_id=str(task.id),
             status="started",
-            task_name=CeleryTasks.collect,
+            task_name=str(CeleryTasks.collect),
         )
+    except ValueError as e:
+        logger.error(f"Validation error in collection task: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to start collection task: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -58,10 +61,19 @@ async def get_collection_status(task_id: str):
     try:
         result = collection_task.AsyncResult(task_id)
 
+        # Handle the result - convert exceptions to string
+        task_result = None
+        if result.ready():
+            if result.successful():
+                task_result = result.result
+            else:
+                # Task failed - convert exception to string
+                task_result = str(result.result) if result.result else None
+
         return TaskStatusResponse(
             task_id=task_id,
             status=result.state,
-            result=result.result if result.ready() else None,
+            result=task_result,
         )
     except Exception as e:
         logger.error(f"Failed to get collection status: {e}")
@@ -133,10 +145,19 @@ async def get_download_status(task_id: str):
     try:
         result = download_task.AsyncResult(task_id)
 
+        # Handle the result - convert exceptions to string
+        task_result = None
+        if result.ready():
+            if result.successful():
+                task_result = result.result
+            else:
+                # Task failed - convert exception to string
+                task_result = str(result.result) if result.result else None
+
         return TaskStatusResponse(
             task_id=task_id,
             status=result.state,
-            result=result.result if result.ready() else None,
+            result=task_result,
         )
     except Exception as e:
         logger.error(f"Failed to get download status: {e}")

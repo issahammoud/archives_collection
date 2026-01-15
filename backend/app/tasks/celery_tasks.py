@@ -17,6 +17,8 @@ db_manager = SyncDBManager()
 @celery_app.task(name=CeleryTasks.collect, bind=False)
 def collection_task(archive, begin_date, end_date):
     # Import here to avoid circular imports at module load time
+    # Import collectors first to register them with the Registry
+    import app.data_scrapping.collectors  # noqa: F401
     from app.data_scrapping.collectors_agg import CollectorsAggregator
 
     try:

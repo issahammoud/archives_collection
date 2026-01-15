@@ -13,6 +13,7 @@ from app.schemas import (
     ArticleListResponse,
     ArticleResponse,
     GroupByResponse,
+    ArchiveCountResponse,
     TagsResponse,
     DateRangeResponse,
     FilterParams,
@@ -232,3 +233,38 @@ async def get_date_range(
 async def get_archives():
     """Get list of available archives."""
     return {"archives": [a.value for a in Archives]}
+
+
+@router.get("/archive-counts", response_model=ArchiveCountResponse)
+async def get_archive_counts(
+    archives: Optional[List[str]] = Query(None),
+    tag: Optional[str] = None,
+    date_start: Optional[date] = None,
+    date_end: Optional[date] = None,
+    query: Optional[str] = None,
+    has_image: Optional[bool] = None,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Get article counts per archive with filters."""
+    try:
+        embedding = None
+        if query:
+            embedding = await get_query_embedding_async(query)
+
+        filters = build_filters(
+            archives=archives,
+            tag=tag,
+            date_start=date_start,
+            date_end=date_end,
+            query=query,
+            has_image=has_image,
+            embedding=embedding,
+        )
+
+        service = ArticleService(session)
+        data = await service.get_archive_counts(filters if filters else None)
+
+        return ArchiveCountResponse(data=data)
+    except Exception as e:
+        logger.error(f"Error getting archive counts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
