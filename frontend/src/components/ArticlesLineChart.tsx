@@ -37,7 +37,13 @@ function ArticlesLineChart({ data, reversed = false }: ArticlesLineChartProps) {
           { name: 'count', color: 'inky-red.4', label: 'Articles' },
         ]}
         curveType="monotone"
-        withDots={false}
+        dotProps={{ r: 1, fill: 'var(--mantine-color-inky-red-4)', strokeWidth: 0 }}
+        activeDotProps={{
+          r: 3,
+          fill: 'var(--mantine-color-inky-navy-5)',
+          stroke: 'white',
+          strokeWidth: 2,
+        }}
         withYAxis={false}
         xAxisProps={{
           tickMargin: 0,
@@ -47,7 +53,35 @@ function ArticlesLineChart({ data, reversed = false }: ArticlesLineChartProps) {
         gridProps={{
           strokeDasharray: '3 3',
         }}
-        withTooltip={false}
+        withTooltip
+        tooltipAnimationDuration={150}
+        tooltipProps={{
+          offset: 20,
+          wrapperStyle: { zIndex: 100 },
+          content: ({ payload, coordinate }) => {
+            if (!payload || payload.length === 0) return null
+            const item = payload[0]
+            return (
+              <Box
+                p="xs"
+                style={{
+                  backgroundColor: 'var(--mantine-color-dark-7)',
+                  borderRadius: 'var(--mantine-radius-sm)',
+                  fontSize: '12px',
+                  color: 'white',
+                  transform: 'translateY(-100%)',
+                  marginTop: '-15px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                }}
+              >
+                <div style={{ fontWeight: 500 }}>{item.payload?.date}</div>
+                <div style={{ color: 'var(--mantine-color-inky-red-4)' }}>
+                  {item.value?.toLocaleString()} articles
+                </div>
+              </Box>
+            )
+          },
+        }}
         valueFormatter={(value) => value.toLocaleString()}
       />
     </Box>
