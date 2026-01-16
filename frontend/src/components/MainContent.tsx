@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   Box,
@@ -12,42 +12,93 @@ import { useStore } from '../store'
 import { articlesApi } from '../api'
 import Carousel from './Carousel'
 
-const SLIDES_PER_PAGE = 2
-const MAX_PAGES = 10
+const CARDS_PER_PAGE = 9
+const MAX_PAGES = 5
 
 function MainContent() {
   const {
     filters,
     pagination,
+    articles: storedArticles,
     setArticles,
     setTotalCount,
     setLastSeen,
+    resetPagination,
   } = useStore()
+
+  // Track if we're navigating (vs initial load or filter change)
+  const isNavigating = useRef(false)
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['articles', filters, pagination],
     queryFn: () =>
-      articlesApi.getArticles(filters, pagination, SLIDES_PER_PAGE * MAX_PAGES),
+      articlesApi.getArticles(filters, pagination, CARDS_PER_PAGE * MAX_PAGES),
     enabled: !!filters.dateStart && !!filters.dateEnd,
   })
 
   const { setCurrentSlide } = useStore()
 
+  // Track when pagination changes (navigation)
   useEffect(() => {
-    if (data) {
-      setArticles(data.articles)
-      setTotalCount(data.total_count)
-      setLastSeen(data.last_seen)
-      // Position carousel based on navigation direction
-      if (pagination.lastSeenDate) {
+    if (pagination.lastSeenDate) {
+      isNavigating.current = true
+    }
+  }, [pagination.lastSeenDate, pagination.lastSeenRowid])
+
+  // Store ref to track last processed data to avoid re-processing
+  const lastProcessedData = useRef<typeof data | null>(null)
+
+  useEffect(() => {
+    if (!data || data === lastProcessedData.current) {
+      return
+    }
+
+    // If navigating and got empty results, stay on current data
+    if (isNavigating.current && data.articles.length === 0) {
+      // Disable navigation in the attempted direction using current store value
+      const currentLastSeen = useStore.getState().lastSeen
+      if (currentLastSeen) {
+        const updatedLastSeen = { ...currentLastSeen }
         if (pagination.direction === 'forward') {
-          setCurrentSlide(0) // Start of new batch
+          updatedLastSeen.forward = null
         } else {
-          setCurrentSlide(MAX_PAGES - 1) // End of previous batch
+          updatedLastSeen.backward = null
         }
+        setLastSeen(updatedLastSeen)
+      }
+      // Reset pagination to go back to stored articles
+      resetPagination()
+      isNavigating.current = false
+      lastProcessedData.current = data
+      return
+    }
+
+    setArticles(data.articles)
+    setTotalCount(data.total_count)
+
+    // If we got fewer articles than requested, we've reached the end
+    // Disable forward navigation in that case
+    const requestedLimit = CARDS_PER_PAGE * MAX_PAGES
+    if (data.articles.length < requestedLimit && data.last_seen) {
+      setLastSeen({
+        ...data.last_seen,
+        forward: null, // No more data forward
+      })
+    } else {
+      setLastSeen(data.last_seen)
+    }
+
+    // Position carousel based on navigation direction
+    if (pagination.lastSeenDate) {
+      if (pagination.direction === 'forward') {
+        setCurrentSlide(0) // Start of new batch
+      } else {
+        setCurrentSlide(MAX_PAGES - 1) // End of previous batch
       }
     }
-  }, [data, setArticles, setTotalCount, setLastSeen, pagination.lastSeenDate, pagination.direction, setCurrentSlide])
+    isNavigating.current = false
+    lastProcessedData.current = data
+  }, [data, pagination.direction, pagination.lastSeenDate, setArticles, setTotalCount, setLastSeen, setCurrentSlide, resetPagination])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -73,7 +124,10 @@ function MainContent() {
     )
   }
 
-  if (!data?.articles || data.articles.length <= SLIDES_PER_PAGE) {
+  // Use stored articles if current data is empty (boundary case)
+  const displayArticles = data?.articles?.length ? data.articles : storedArticles
+
+  if (!displayArticles || displayArticles.length === 0) {
     return (
       <Center h={400}>
         <Paper p="xl" withBorder radius="md" bg="red.0">
@@ -97,8 +151,8 @@ function MainContent() {
       style={{ borderRadius: 'var(--mantine-radius-md)' }}
     >
       <Carousel
-        articles={data.articles}
-        slidesPerPage={SLIDES_PER_PAGE}
+        articles={displayArticles}
+        slidesPerPage={CARDS_PER_PAGE}
         maxPages={MAX_PAGES}
       />
     </Box>

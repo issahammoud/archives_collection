@@ -1,16 +1,19 @@
-import { useCallback, useEffect, useState } from 'react'
-import useEmblaCarousel from 'embla-carousel-react'
+import { useCallback, useState, useEffect } from 'react'
 import { Box, Group, ActionIcon, SimpleGrid } from '@mantine/core'
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
 import type { Article } from '../types'
 import { useStore } from '../store'
 import ArticleCard from './ArticleCard'
+import ArticlePreviewCard from './ArticlePreviewCard'
+import { Grid } from '@mantine/core'
 
 interface CarouselProps {
   articles: Article[]
   slidesPerPage: number
   maxPages: number
 }
+
+const CARDS_PER_PAGE = 9
 
 function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
   const {
@@ -20,88 +23,97 @@ function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
     setCurrentSlide,
   } = useStore()
 
-  // Group articles into pages - must be before hooks that use it
+  // Group articles into pages of 6
   const pages: Article[][] = []
-  for (let i = 0; i < articles.length; i += slidesPerPage) {
-    pages.push(articles.slice(i, i + slidesPerPage))
+  for (let i = 0; i < articles.length; i += CARDS_PER_PAGE) {
+    pages.push(articles.slice(i, i + CARDS_PER_PAGE))
   }
   const totalPages = pages.length
 
-  const [emblaRef, emblaApi] = useEmblaCarousel({
-    loop: false,
-    align: 'start',
-    slidesToScroll: 1,
-    containScroll: 'trimSnaps',
-  })
+  // Current page index
+  const [pageIndex, setPageIndex] = useState(0)
+  // Selected card index within the current page (0-8)
+  const [selectedCardIndex, setSelectedCardIndex] = useState(0)
+  // For fade animation
+  const [isTransitioning, setIsTransitioning] = useState(false)
 
-  const [canScrollPrev, setCanScrollPrev] = useState(false)
-  const [canScrollNext, setCanScrollNext] = useState(false)
-  const [selectedIndex, setSelectedIndex] = useState(0)
   const [isHovered, setIsHovered] = useState(false)
 
-  const onSelect = useCallback(() => {
-    if (!emblaApi) return
-    setSelectedIndex(emblaApi.selectedScrollSnap())
-    setCanScrollPrev(emblaApi.canScrollPrev())
-    setCanScrollNext(emblaApi.canScrollNext())
-  }, [emblaApi])
+  // Handle card selection with fade animation
+  const handleCardSelect = (index: number) => {
+    if (index === selectedCardIndex) return
+    setIsTransitioning(true)
+    setTimeout(() => {
+      setSelectedCardIndex(index)
+      setIsTransitioning(false)
+    }, 150)
+  }
 
+  // Get current page articles
+  const currentPageArticles = pages[pageIndex] || []
+  // Get the selected article for the big card
+  const selectedArticle = currentPageArticles[selectedCardIndex]
+
+  // Sync page index when currentSlide changes from store
   useEffect(() => {
-    if (!emblaApi) return
-
-    onSelect()
-    emblaApi.on('select', onSelect)
-    emblaApi.on('reInit', onSelect)
-
-    return () => {
-      emblaApi.off('select', onSelect)
-      emblaApi.off('reInit', onSelect)
-    }
-  }, [emblaApi, onSelect])
-
-  // Sync carousel position when new batch loads (only when articles change)
-  const articlesKey = articles.map(a => a.rowid).join(',')
-  useEffect(() => {
-    if (emblaApi && articles.length > 0) {
-      const targetSlide = Math.min(currentSlide, totalPages - 1)
-      emblaApi.scrollTo(targetSlide, false)
+    if (currentSlide !== pageIndex) {
+      setPageIndex(currentSlide)
+      setSelectedCardIndex(0)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emblaApi, articlesKey])
+  }, [currentSlide])
 
+  // Reset selection when articles change
+  const articlesKey = articles.map(a => a.rowid).join(',')
   useEffect(() => {
-    if (selectedIndex !== currentSlide) {
-      setCurrentSlide(selectedIndex)
-    }
-  }, [selectedIndex, currentSlide, setCurrentSlide])
+    setSelectedCardIndex(0)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [articlesKey])
+
+  const canScrollPrev = pageIndex > 0 || !!lastSeen?.backward
+  const canScrollNext = pageIndex < totalPages - 1 || !!lastSeen?.forward
 
   const scrollPrev = useCallback(() => {
-    if (!emblaApi) return
-    if (selectedIndex === 0 && lastSeen?.backward) {
-      // At first slide, fetch previous batch
+    if (pageIndex === 0 && lastSeen?.backward) {
+      // At first page, fetch previous batch
       setPagination({
         direction: 'backward',
         lastSeenDate: lastSeen.backward.date,
         lastSeenRowid: lastSeen.backward.rowid,
       })
-    } else {
-      emblaApi.scrollPrev()
+    } else if (pageIndex > 0) {
+      const newIndex = pageIndex - 1
+      setPageIndex(newIndex)
+      setCurrentSlide(newIndex)
+      setSelectedCardIndex(0)
     }
-  }, [emblaApi, selectedIndex, lastSeen, setPagination])
+  }, [pageIndex, lastSeen, setPagination, setCurrentSlide])
 
   const scrollNext = useCallback(() => {
-    if (!emblaApi) return
-    if (selectedIndex === totalPages - 1 && lastSeen?.forward) {
-      // At last slide, fetch next batch
+    if (pageIndex === totalPages - 1 && lastSeen?.forward) {
+      // At last page, fetch next batch
       setPagination({
         direction: 'forward',
         lastSeenDate: lastSeen.forward.date,
         lastSeenRowid: lastSeen.forward.rowid,
       })
-    } else {
-      emblaApi.scrollNext()
+    } else if (pageIndex < totalPages - 1) {
+      const newIndex = pageIndex + 1
+      setPageIndex(newIndex)
+      setCurrentSlide(newIndex)
+      setSelectedCardIndex(0)
     }
-  }, [emblaApi, selectedIndex, totalPages, lastSeen, setPagination])
+  }, [pageIndex, totalPages, lastSeen, setPagination, setCurrentSlide])
+
+  const goToPage = useCallback((index: number) => {
+    setPageIndex(index)
+    setCurrentSlide(index)
+    setSelectedCardIndex(0)
+  }, [setCurrentSlide])
+
+  if (!selectedArticle) {
+    return null
+  }
 
   return (
     <Box
@@ -109,73 +121,84 @@ function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <Box ref={emblaRef} style={{ overflow: 'hidden' }}>
-        <Box style={{ display: 'flex' }}>
-          {pages.map((pageArticles, pageIndex) => (
-            <Box
-              key={pageIndex}
-              style={{
-                flex: '0 0 100%',
-                minWidth: 0,
-                paddingRight: 'var(--mantine-spacing-md)',
-              }}
-            >
-              <SimpleGrid cols={slidesPerPage} spacing="lg">
-                {pageArticles.map((article) => (
-                  <ArticleCard key={article.rowid} article={article} />
-                ))}
-              </SimpleGrid>
-            </Box>
-          ))}
-        </Box>
-      </Box>
+      <Grid gutter="xl" align="stretch">
+        {/* Left side: 9 small preview cards in 3 columns */}
+        <Grid.Col span={5}>
+          <SimpleGrid cols={3} spacing="sm">
+            {currentPageArticles.map((article, index) => (
+              <ArticlePreviewCard
+                key={article.rowid}
+                article={article}
+                isSelected={index === selectedCardIndex}
+                onClick={() => handleCardSelect(index)}
+              />
+            ))}
+          </SimpleGrid>
+        </Grid.Col>
 
-      <ActionIcon
-        variant="filled"
-        color="inky-red.4"
-        radius="xl"
-        size="lg"
-        onClick={scrollPrev}
-        disabled={!canScrollPrev && !lastSeen?.backward}
-        pos="absolute"
-        left={10}
-        top="50%"
-        style={{
-          transform: 'translateY(-50%)',
-          opacity: isHovered && (canScrollPrev || lastSeen?.backward) ? 1 : 0,
-          transition: 'opacity 200ms ease',
-          pointerEvents: isHovered ? 'auto' : 'none',
-        }}
-      >
-        <IconChevronLeft size={20} />
-      </ActionIcon>
+        <Grid.Col span={7}>
+          <Box
+            style={{
+              height: '100%',
+            }}
+          >
+            <ArticleCard article={selectedArticle} />
+          </Box>
+        </Grid.Col>
+      </Grid>
 
-      <ActionIcon
-        variant="filled"
-        color="inky-red.4"
-        radius="xl"
-        size="lg"
-        onClick={scrollNext}
-        disabled={!canScrollNext && !lastSeen?.forward}
-        pos="absolute"
-        right={10}
-        top="50%"
-        style={{
-          transform: 'translateY(-50%)',
-          opacity: isHovered && (canScrollNext || lastSeen?.forward) ? 1 : 0,
-          transition: 'opacity 200ms ease',
-          pointerEvents: isHovered ? 'auto' : 'none',
-        }}
-      >
-        <IconChevronRight size={20} />
-      </ActionIcon>
+      {/* Navigation buttons - only render when navigation is possible */}
+      {canScrollPrev && (
+        <ActionIcon
+          variant="filled"
+          color="inky-red.4"
+          radius="xl"
+          size="lg"
+          onClick={scrollPrev}
+          pos="absolute"
+          left={-20}
+          top="50%"
+          style={{
+            transform: 'translateY(-50%)',
+            opacity: isHovered ? 1 : 0,
+            transition: 'opacity 200ms ease',
+            pointerEvents: isHovered ? 'auto' : 'none',
+            zIndex: 10,
+          }}
+        >
+          <IconChevronLeft size={20} />
+        </ActionIcon>
+      )}
 
+      {canScrollNext && (
+        <ActionIcon
+          variant="filled"
+          color="inky-red.4"
+          radius="xl"
+          size="lg"
+          onClick={scrollNext}
+          pos="absolute"
+          right={-20}
+          top="50%"
+          style={{
+            transform: 'translateY(-50%)',
+            opacity: isHovered ? 1 : 0,
+            transition: 'opacity 200ms ease',
+            pointerEvents: isHovered ? 'auto' : 'none',
+            zIndex: 10,
+          }}
+        >
+          <IconChevronRight size={20} />
+        </ActionIcon>
+      )}
+
+      {/* Page indicator dots */}
       <Group
         justify="center"
         gap={8}
         style={{
           position: 'absolute',
-          bottom: -20,
+          bottom: -24,
           left: '50%',
           transform: 'translateX(-50%)',
         }}
@@ -183,13 +206,13 @@ function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
         {Array.from({ length: totalPages }).map((_, index) => (
           <Box
             key={index}
-            onClick={() => emblaApi?.scrollTo(index)}
+            onClick={() => goToPage(index)}
             style={{
-              width: 8,
-              height: 8,
+              width: 6,
+              height: 6,
               borderRadius: '50%',
               backgroundColor:
-                index === selectedIndex
+                index === pageIndex
                   ? 'var(--mantine-color-inky-red-4)'
                   : 'var(--mantine-color-gray-3)',
               cursor: 'pointer',

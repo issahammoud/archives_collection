@@ -1,15 +1,22 @@
 import { create } from 'zustand'
 import type { FilterState, PaginationState, Article } from '../types'
 
+interface LastSeenCursor {
+  date: string
+  rowid: number
+}
+
+interface LastSeenState {
+  forward: LastSeenCursor | null
+  backward: LastSeenCursor | null
+}
+
 interface AppState {
   filters: FilterState
   pagination: PaginationState
   articles: Article[]
   totalCount: number
-  lastSeen: {
-    forward: { date: string; rowid: number }
-    backward: { date: string; rowid: number }
-  } | null
+  lastSeen: LastSeenState | null
   currentSlide: number
   downloadTaskId: string | null
   isDownloading: boolean
@@ -18,12 +25,7 @@ interface AppState {
   setPagination: (pagination: Partial<PaginationState>) => void
   setArticles: (articles: Article[]) => void
   setTotalCount: (count: number) => void
-  setLastSeen: (
-    lastSeen: {
-      forward: { date: string; rowid: number }
-      backward: { date: string; rowid: number }
-    } | null
-  ) => void
+  setLastSeen: (lastSeen: LastSeenState | null) => void
   setCurrentSlide: (slide: number) => void
   setDownloadTaskId: (taskId: string | null) => void
   setIsDownloading: (isDownloading: boolean) => void

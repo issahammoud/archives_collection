@@ -11,7 +11,6 @@ import {
   Tooltip,
   Blockquote,
 } from '@mantine/core'
-import { IconQuote } from '@tabler/icons-react'
 import { IconQuoteFilled } from '@tabler/icons-react'
 import dayjs from 'dayjs'
 import type { Article } from '../types'
@@ -58,28 +57,30 @@ function ArticleCard({ article }: ArticleCardProps) {
         color: 'inherit',
         display: 'flex',
         flexDirection: 'column',
-        transition: 'transform 150ms ease, box-shadow 150ms ease',
+        // transition: 'transform 150ms ease, box-shadow 150ms ease',
       }}
       styles={{
         root: {
           '&:hover': {
-            transform: 'scale(1.02)',
+            // transform: 'scale(1.02)',
             boxShadow: 'var(--mantine-shadow-lg)',
           },
         },
       }}
     >
+      
       <Card.Section>
         <Image
           src={imageUrl}
           alt={article.title || 'Article image'}
-          h={200}
+          h={180}
+          fit="cover"
           fallbackSrc="https://placehold.co/600x400?text=Placeholder"
           onError={() => setImageError(true)}
         />
       </Card.Section>
 
-      <Stack gap="md" mt="md" style={{ flex: 1 }}>
+      <Stack gap="xs" mt="md" style={{ flex: 1 }}>
         <Group justify="space-between">
           <Text size="xs" c="dimmed">{archiveName}</Text>
           <Text size="xs" c="dimmed">{formattedDate}</Text>
@@ -91,17 +92,17 @@ function ArticleCard({ article }: ArticleCardProps) {
           </Text>
         </Tooltip>
 
-        <Blockquote color="inky-navy.5" radius="md" icon={
+        <Blockquote color="inky-navy.5" radius="md" iconSize={35} icon={
             <Box style={{ transform: "rotate(180deg)" }}>
               <IconQuoteFilled
-                size={16}
+                size={20}
                 color="var(--mantine-color-inky-red-5)"
               />
             </Box>
           }
-          p="xs"
+          p="sm"
         >
-        <ScrollArea h={140} offsetScrollbars scrollbarSize={6}>
+        <ScrollArea h={90} offsetScrollbars scrollbarSize={6}>
           <Text size="sm" c="inky-dark" lh={1.6} ta="justify">
             {article.content || "No content available"}
           </Text>

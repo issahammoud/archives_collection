@@ -38,7 +38,7 @@ function App() {
 
         {/* Main Content Area - Split 70/30 */}
         <Box px="md">
-          <Grid gutter="xl">
+          <Grid gutter="xl" grow align="center" justify='center'>
             {/* Left Panel - 70% - Carousel with white background */}
             <Grid.Col span={8}>
               <MainContent />
