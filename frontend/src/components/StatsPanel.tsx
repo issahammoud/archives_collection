@@ -84,46 +84,13 @@ function StatsPanel() {
             </Badge>
           </Tooltip>
 
-          {/* Topic Filter */}
-          <Popover position="bottom" withArrow shadow="md" width={220}>
-            <Popover.Target>
-              <Tooltip label="Filter by topic" withArrow position="bottom">
-                <ActionIcon
-                  variant={filters.tag ? 'filled' : 'light'}
-                  color="inky-navy"
-                  size="md"
-                  radius="md"
-                >
-                  <IconTag size={16} />
-                </ActionIcon>
-              </Tooltip>
-            </Popover.Target>
-            <Popover.Dropdown>
-              <Select
-                placeholder="Search by topic"
-                value={filters.tag}
-                onChange={(value) => {
-                  setFilters({ tag: value })
-                  resetPagination()
-                }}
-                data={tagsData?.tags.map((tag) => ({ value: tag, label: tag })) || []}
-                clearable
-                searchable
-                variant="default"
-                radius="md"
-                size="xs"
-                comboboxProps={{ transitionProps: { transition: 'pop', duration: 200 } }}
-              />
-            </Popover.Dropdown>
-          </Popover>
-
           {/* Archive Filter */}
           <Popover position="bottom" withArrow shadow="md" width={220}>
             <Popover.Target>
               <Tooltip label="Filter by archive" withArrow position="bottom">
                 <ActionIcon
-                  variant={filters.archives.length > 0 ? 'filled' : 'light'}
-                  color="inky-navy"
+                  variant= {filters.archives.length > 0 ? 'outline' : 'subtle'}
+                  color="inky-red-5"
                   size="md"
                   radius="md"
                 >
@@ -143,7 +110,7 @@ function StatsPanel() {
                 clearable
                 searchable
                 hidePickedOptions
-                variant="default"
+                variant="subtle"
                 radius="md"
                 size="xs"
                 comboboxProps={{ transitionProps: { transition: 'pop', duration: 200 } }}
