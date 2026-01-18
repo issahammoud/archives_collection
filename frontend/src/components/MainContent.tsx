@@ -26,8 +26,8 @@ function MainContent() {
     resetPagination,
   } = useStore()
 
-  // Track if we're navigating (vs initial load or filter change)
   const isNavigating = useRef(false)
+  const lastProcessedData = useRef<string | null>(null) // Store as stringified key to detect real changes
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['articles', filters, pagination],
@@ -36,24 +36,25 @@ function MainContent() {
     enabled: !!filters.dateStart && !!filters.dateEnd,
   })
 
-  // Track when pagination changes (navigation)
+  // Track when navigation occurs
   useEffect(() => {
-    if (pagination.lastSeenDate) {
+    if (pagination.lastSeenDate || pagination.lastSeenRowid) {
       isNavigating.current = true
     }
   }, [pagination.lastSeenDate, pagination.lastSeenRowid])
 
-  // Store ref to track last processed data to avoid re-processing
-  const lastProcessedData = useRef<typeof data | null>(null)
-
+  // Main synchronization effect
   useEffect(() => {
-    if (!data || data === lastProcessedData.current) {
-      return
+    // 1. Guard: Only proceed if we have data and it's actually "new" data
+    // We use a JSON string check because React Query might return a new object reference 
+    // for the same data content, which triggers the effect loop.
+    const dataSignature = JSON.stringify(data);
+    if (!data || dataSignature === lastProcessedData.current) {
+      return;
     }
 
-    // If navigating and got empty results, stay on current data
+    // 2. Handle the "No Results Found" case while navigating
     if (isNavigating.current && data.articles.length === 0) {
-      // Disable navigation in the attempted direction using current store value
       const currentLastSeen = useStore.getState().lastSeen
       if (currentLastSeen) {
         const updatedLastSeen = { ...currentLastSeen }
@@ -64,69 +65,62 @@ function MainContent() {
         }
         setLastSeen(updatedLastSeen)
       }
-      // Reset pagination to go back to stored articles
-      resetPagination()
-      isNavigating.current = false
-      lastProcessedData.current = data
-      return
+      
+      lastProcessedData.current = dataSignature; // Mark as processed BEFORE state update
+      isNavigating.current = false;
+      resetPagination(); 
+      return;
     }
 
+    // 3. Successful Data Update
     setArticles(data.articles)
     setTotalCount(data.total_count)
 
-    // If we got fewer articles than requested, we've reached the end
-    // Disable forward navigation in that case
+    // 4. Update Pagination Boundaries
     const requestedLimit = CARDS_PER_PAGE * MAX_PAGES
     if (data.articles.length < requestedLimit && data.last_seen) {
       setLastSeen({
         ...data.last_seen,
-        forward: null, // No more data forward
+        forward: null,
       })
     } else {
       setLastSeen(data.last_seen)
     }
 
-    isNavigating.current = false
-    lastProcessedData.current = data
-  }, [data, pagination.direction, pagination.lastSeenDate, setArticles, setTotalCount, setLastSeen, resetPagination])
+    // Finalize processing
+    lastProcessedData.current = dataSignature;
+    isNavigating.current = false;
 
+    // We keep dependencies minimal to avoid re-triggering on local pagination changes 
+    // unless the underlying DATA has actually changed via the API.
+  }, [data, setArticles, setTotalCount, setLastSeen, resetPagination, pagination.direction])
+
+  // Periodic Refetch
   useEffect(() => {
     const interval = setInterval(() => {
       refetch()
     }, 5000)
-
     return () => clearInterval(interval)
   }, [refetch])
 
-  // Use stored articles if current data is empty (boundary case)
   const displayArticles = data?.articles?.length ? data.articles : storedArticles
 
-  // Show error state
   if (error) {
     return (
       <Center h={400}>
         <Paper p="xl" withBorder radius="md" bg="red.0">
           <Stack align="center" gap="xs">
-            <Text size="lg" fw={500} c="red.8">
-              Error
-            </Text>
-            <Text c="red.6">
-              Something went wrong. Please try again.
-            </Text>
+            <Text size="lg" fw={500} c="red.8">Error</Text>
+            <Text c="red.6">Something went wrong. Please try again.</Text>
           </Stack>
         </Paper>
       </Center>
     )
   }
 
-  // Show skeleton only on initial load (when no data exists yet)
   if (isLoading && (!storedArticles || storedArticles.length === 0)) {
     return (
-      <Box
-        p="lg"
-        h="100%"
-        style={{ borderRadius: 'var(--mantine-radius-md)' }}
-      >
+      <Box p="lg" h="100%" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
         <CarouselSkeleton />
       </Box>
     )
@@ -137,12 +131,8 @@ function MainContent() {
       <Center h={400}>
         <Paper p="xl" withBorder radius="md" bg="red.0">
           <Stack align="center" gap="xs">
-            <Text size="lg" fw={500} c="red.8">
-              Sorry
-            </Text>
-            <Text c="red.6">
-              We didn't find any data with your current filters.
-            </Text>
+            <Text size="lg" fw={500} c="red.8">Sorry</Text>
+            <Text c="red.6">We didn't find any data with your current filters.</Text>
           </Stack>
         </Paper>
       </Center>
@@ -150,11 +140,7 @@ function MainContent() {
   }
 
   return (
-    <Box
-      p="lg"
-      h="100%"
-      style={{ borderRadius: 'var(--mantine-radius-md)' }}
-    >
+    <Box p="lg" h="100%" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
       <Carousel
         articles={displayArticles}
         slidesPerPage={CARDS_PER_PAGE}
