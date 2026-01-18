@@ -7,31 +7,35 @@ import {
   ActionIcon,
   Tooltip,
   Popover,
-  Select,
   MultiSelect,
-  Text,
+  Skeleton,
 } from '@mantine/core'
 import { DatePickerInput } from '@mantine/dates'
-import { IconTag, IconBook } from '@tabler/icons-react'
+import { IconBook } from '@tabler/icons-react'
 import { useStore } from '../store'
 import { articlesApi } from '../api'
 import ArticlesLineChart from './ArticlesLineChart'
 import ArchivePieChart from './ArchivePieChart'
+import { LineChartSkeleton, PieChartSkeleton } from './Skeletons'
 import dayjs from 'dayjs'
 
 function StatsPanel() {
   const { filters, totalCount, setFilters, resetPagination } = useStore()
 
-  const { data: groupByData } = useQuery({
+  const isDateRangeComplete = !!filters.dateStart && !!filters.dateEnd
+
+  const { data: groupByData, isLoading: isLoadingGroupBy } = useQuery({
     queryKey: ['groupBy', filters, filters.groupBy],
     queryFn: () => articlesApi.getGroupBy(filters, filters.groupBy),
-    enabled: !!filters.dateStart && !!filters.dateEnd,
+    enabled: isDateRangeComplete,
+    placeholderData: (prev) => prev, // Keep previous data while selecting date range
   })
 
-  const { data: archiveCountsData } = useQuery({
+  const { data: archiveCountsData, isLoading: isLoadingArchiveCounts } = useQuery({
     queryKey: ['archiveCounts', filters],
     queryFn: () => articlesApi.getArchiveCounts(filters),
-    enabled: !!filters.dateStart && !!filters.dateEnd,
+    enabled: isDateRangeComplete,
+    placeholderData: (prev) => prev, // Keep previous data while selecting date range
   })
 
   const { data: tagsData } = useQuery({
@@ -65,24 +69,27 @@ function StatsPanel() {
       <Stack gap={24} justify="space-between">
         {/* Article Count and Filters Row - All 4 elements in one row */}
         <Group gap="xs" align="center" justify="space-around">
-          <Tooltip label={`${totalCount.toLocaleString()} articles`} withArrow position="bottom">
-            <Badge
-              size="xl"
-              variant="filled"
-              color="inky-red.5"
-              radius="xl"
-              px="xl"
-              styles={{
-                root: {
-                  textTransform: 'none',
-                  fontSize: '0.9rem',
-                  // cursor: 'default',
-                },
-              }}
-            >
-              {formatCount(totalCount)}
-            </Badge>
-          </Tooltip>
+          {totalCount === 0 ? (
+            <Skeleton height={32} width={70} radius="xl" />
+          ) : (
+            <Tooltip label={`${totalCount.toLocaleString()} articles`} withArrow position="bottom">
+              <Badge
+                size="xl"
+                variant="filled"
+                color="inky-red.5"
+                radius="xl"
+                px="xl"
+                styles={{
+                  root: {
+                    textTransform: 'none',
+                    fontSize: '0.9rem',
+                  },
+                }}
+              >
+                {formatCount(totalCount)}
+              </Badge>
+            </Tooltip>
+          )}
 
           {/* Archive Filter */}
           <Popover position="bottom" withArrow shadow="md" width={220}>
@@ -143,14 +150,18 @@ function StatsPanel() {
         </Group>
 
         {/* Line Chart */}
-        {groupByData && (
+        {isLoadingGroupBy ? (
+          <LineChartSkeleton />
+        ) : groupByData ? (
           <ArticlesLineChart data={groupByData.data} reversed={!filters.descOrder} />
-        )}
+        ) : null}
 
         {/* Pie Chart */}
-        {archiveCountsData && (
+        {isLoadingArchiveCounts ? (
+          <PieChartSkeleton />
+        ) : archiveCountsData ? (
           <ArchivePieChart data={archiveCountsData.data} />
-        )}
+        ) : null}
       </Stack>
     </Box>
   )

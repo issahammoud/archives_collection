@@ -1,0 +1,94 @@
+services:
+
+  backend_base: &backend_base
+    build:
+      context: backend/
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_HOST=db
+      - DATABASE_PORT=5432
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_REGION=${S3_REGION}
+    depends_on:
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+    volumes:
+      - ./backend/:/backend
+
+  backend:
+    <<: *backend_base
+    ports:
+      - "8000:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  celery:
+    <<: *backend_base
+    command: celery -A app.core.celery_app.celery_app worker --loglevel=debug
+    cpu_period: 100000
+    cpu_quota: 1000000
+
+  frontend:
+    build:
+      context: frontend/
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/frontend
+      - /frontend/node_modules
+    environment:
+      - VITE_API_URL=http://backend:8000
+
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    command: >
+      postgres
+      -c shared_buffers=6GB
+      -c effective_cache_size=8GB
+      -c work_mem=64MB
+      -c maintenance_work_mem=512MB
+      -c max_connections=200
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c autovacuum_max_workers=3
+      -c autovacuum_naptime=30s
+      -c max_wal_size=2GB
+      -c min_wal_size=1GB
+      -c log_min_duration_statement=4000
+    shm_size: 4gb
+    ports:
+      - "5432:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 8GB
+        reservations:
+          memory: 4GB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4.2-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:

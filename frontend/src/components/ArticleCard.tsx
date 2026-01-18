@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import {
   Card,
-  // Image, // Removed Mantine Image
   Text,
   Group,
   Stack,
@@ -10,10 +9,11 @@ import {
   Badge,
   Tooltip,
   Blockquote,
+  Skeleton,
 } from '@mantine/core'
 import { IconQuoteFilled } from '@tabler/icons-react'
 import { LazyLoadImage } from 'react-lazy-load-image-component'
-import 'react-lazy-load-image-component/src/effects/blur.css' // The blur effect styles
+import 'react-lazy-load-image-component/src/effects/blur.css'
 import dayjs from 'dayjs'
 import type { Article } from '../types'
 
@@ -23,6 +23,7 @@ interface ArticleCardProps {
 
 function ArticleCard({ article }: ArticleCardProps) {
   const [imageError, setImageError] = useState(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
 
   const formattedDate = article.date
     ? dayjs(article.date).format('MMMM, DD YYYY')
@@ -69,28 +70,26 @@ function ArticleCard({ article }: ArticleCardProps) {
       }}
     >
       <Card.Section>
-        {/* Wrapper div is critical here: 
-           It reserves the 180px height immediately so the layout doesn't shift 
-        */}
-        <div style={{ height: 180, width: '100%', overflow: 'hidden', backgroundColor: '#f1f3f5' }}>
+        <div style={{ height: 180, width: '100%', overflow: 'hidden', position: 'relative' }}>
+          {!imageLoaded && (
+            <Skeleton height={180} radius={0} style={{ position: 'absolute', top: 0, left: 0, right: 0 }} />
+          )}
           <LazyLoadImage
             src={imageUrl}
             alt={article.title || 'Article image'}
             height={180}
             width="100%"
-            effect="blur" // Adds the smooth fade-in
+            effect="blur"
             onError={() => setImageError(true)}
-            
-            // Manual styling to match Mantine's 'fit="cover"'
-            style={{ 
-              objectFit: 'cover', 
-              width: '100%', 
-              height: '100%' 
+            afterLoad={() => setImageLoaded(true)}
+            style={{
+              objectFit: 'cover',
+              width: '100%',
+              height: '100%',
+              opacity: imageLoaded ? 1 : 0,
             }}
-            
-            // Ensures the library's wrapper span also fills the space
             wrapperProps={{
-                style: { width: '100%', height: '100%', display: 'block' }
+              style: { width: '100%', height: '100%', display: 'block' }
             }}
           />
         </div>

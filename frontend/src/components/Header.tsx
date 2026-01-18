@@ -1,6 +1,6 @@
 import { Container, Group, Stack, Text } from '@mantine/core'
 
-const Logo = ({ color1, color2, size }) => (
+const Logo = ({ color1, color2, size }: { color1: string; color2: string; size: number }) => (
   <svg
     width={size}
     height={size}

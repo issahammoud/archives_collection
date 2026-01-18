@@ -43,109 +43,142 @@ def collection_task(archive, begin_date, end_date):
 
 @celery_app.task(name=CeleryTasks.download, bind=False)
 def download_task(columns, filters, order):
-    from sqlalchemy import MetaData, Table, select, inspect, text, func, tuple_
+    import tempfile
+    import redis
+    from sqlalchemy import MetaData, Table, select, inspect
+    from app.core.s3_client import sync_s3_client
 
-    chunk_index = 1
-    CHUNK_SIZE = 10_000
-    MAX_ARTICLES = 100_000  # Total limit to prevent server RAM overload
-    total_fetched = 0
-    zip_path = f"{settings.IMAGES_PATH}/data.zip"
+    MAX_ARTICLES = 1000  # Limit to 1000 rows for download with images
+    REDIS_KEY = "download:data.zip"
 
-    if os.path.exists(zip_path):
-        os.remove(zip_path)
+    # Connect to Redis
+    redis_client = redis.from_url(settings.REDIS_URL)
 
     engine = db_manager.get_engine()
     inspector = inspect(engine)
 
     if "articles" not in inspector.get_table_names():
-        return zip_path
+        # Store empty zip in Redis
+        redis_client.setex(REDIS_KEY, 3600, b"")
+        return "done"
 
     metadata = MetaData()
     table_ref = Table("articles", metadata, autoload_with=engine)
 
     columns_to_select = [DBCOLUMNS(c) if isinstance(c, str) else c for c in columns]
 
-    with zipfile.ZipFile(zip_path, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-        last_seen = None
+    # Fetch articles (up to MAX_ARTICLES)
+    logger.info("Fetching articles from database...")
+    with engine.connect() as conn:
+        with conn.begin():
+            query = select(*[table_ref.c[c] for c in columns_to_select])
 
-        while total_fetched < MAX_ARTICLES:
-            # Calculate remaining articles to fetch
-            remaining = MAX_ARTICLES - total_fetched
-            current_limit = min(CHUNK_SIZE, remaining)
+            # Apply filters using OPERATORS enum values
+            from app.core.enums import OPERATORS
+            from sqlalchemy import func
+            for col_name, conditions in filters.items():
+                col = table_ref.c[col_name]
+                for op, value in conditions:
+                    op_str = op.value if hasattr(op, 'value') else str(op)
+                    if op_str == "ge":
+                        query = query.where(col >= value)
+                    elif op_str == "le":
+                        query = query.where(col <= value)
+                    elif op_str == "like":
+                        query = query.where(func.upper(col).like(f"%{value.upper()}%"))
+                    elif op_str == "in":
+                        query = query.where(col.in_(value))
+                    elif op_str == "text_search":
+                        ts_query = func.plainto_tsquery("french", func.unaccent(value))
+                        query = query.where(col.op("@@")(ts_query))
+                    elif op_str == "notnull":
+                        query = query.where(col.isnot(None))
+                        query = query.where(col != "")
 
-            with engine.connect() as conn:
-                with conn.begin():
-                    conn.execute(
-                        text("SET LOCAL hnsw.ef_search = :ef_val"),
-                        {"ef_val": settings.HNSW_EF_SEARCH},
-                    )
-                    conn.execute(text("SET LOCAL hnsw.iterative_scan = relaxed_order"))
+            if order:
+                query = query.order_by(
+                    table_ref.c.date.desc(), table_ref.c.rowid.desc()
+                )
+            else:
+                query = query.order_by(
+                    table_ref.c.date.asc(), table_ref.c.rowid.asc()
+                )
 
-                    query = select(*[table_ref.c[c] for c in columns_to_select])
+            query = query.limit(MAX_ARTICLES)
+            result = conn.execute(query)
+            rows = result.fetchall()
 
-                    if last_seen:
-                        last_date = last_seen.get(DBCOLUMNS.date) or last_seen.get(
-                            "date"
-                        )
-                        last_rowid = last_seen.get(DBCOLUMNS.rowid) or last_seen.get(
-                            "rowid"
-                        )
+    logger.info(f"Fetched {len(rows)} articles from database")
 
-                        if isinstance(last_date, str):
-                            last_date = date.fromisoformat(last_date)
+    if not rows:
+        # Store empty zip in Redis
+        from io import BytesIO
+        buffer = BytesIO()
+        with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("data.csv", "")
+        redis_client.setex(REDIS_KEY, 3600, buffer.getvalue())
+        return "done"
 
-                        if order:
-                            query = query.where(
-                                tuple_(table_ref.c.date, table_ref.c.rowid)
-                                < (last_date, last_rowid)
-                            )
-                        else:
-                            query = query.where(
-                                tuple_(table_ref.c.date, table_ref.c.rowid)
-                                > (last_date, last_rowid)
-                            )
+    # Create DataFrame
+    df = pd.DataFrame(rows, columns=columns_to_select)
 
-                    if order:
-                        query = query.order_by(
-                            table_ref.c.date.desc(), table_ref.c.rowid.desc()
-                        )
+    # Get image column index if it exists
+    image_col = DBCOLUMNS.image if DBCOLUMNS.image in columns_to_select else None
+
+    # Create ZIP in memory
+    from io import BytesIO
+    buffer = BytesIO()
+
+    logger.info(f"Starting ZIP creation with {len(df)} articles")
+
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        images_downloaded = 0
+        images_failed = 0
+
+        # Process images and update paths
+        if image_col and image_col in df.columns:
+            new_image_paths = []
+            total_images = len(df)
+            for idx, row in df.iterrows():
+                s3_key = row[image_col]
+                # Strip /images/ prefix if present
+                if s3_key and isinstance(s3_key, str) and s3_key.startswith("/images/"):
+                    s3_key = s3_key.replace("/images/", "", 1)
+                if s3_key and pd.notna(s3_key):
+                    # Download image from S3
+                    image_bytes = sync_s3_client.download_image(s3_key)
+                    if image_bytes:
+                        # Add image to ZIP in images/ folder
+                        image_filename = os.path.basename(s3_key)
+                        zf.writestr(f"images/{image_filename}", image_bytes)
+                        new_image_paths.append(f"images/{image_filename}")
+                        images_downloaded += 1
                     else:
-                        query = query.order_by(
-                            table_ref.c.date.asc(), table_ref.c.rowid.asc()
-                        )
+                        new_image_paths.append("")
+                        images_failed += 1
+                else:
+                    new_image_paths.append("")
 
-                    query = query.limit(current_limit)
-                    result = conn.execute(query)
-                    rows = result.fetchall()
+                # Log progress every 100 images
+                processed = images_downloaded + images_failed
+                if processed % 100 == 0:
+                    logger.info(f"Download progress: {processed}/{total_images} images processed")
 
-            if not rows:
-                break
+            # Update image column with new paths
+            df[image_col] = new_image_paths
 
-            total_fetched += len(rows)
+        # Write CSV to ZIP
+        csv_buffer = StringIO()
+        df.to_csv(csv_buffer, index=False)
+        zf.writestr("data.csv", csv_buffer.getvalue())
 
-            last_seen = {
-                DBCOLUMNS.date: (
-                    rows[-1][1].isoformat()
-                    if hasattr(rows[-1][1], "isoformat")
-                    else rows[-1][1]
-                ),
-                DBCOLUMNS.rowid: rows[-1][0],
-            }
-
-            df = pd.DataFrame(rows, columns=columns_to_select)
-            csv_buffer = StringIO()
-            df.to_csv(csv_buffer, index=False)
-            zf.writestr(f"data_chunk_{chunk_index:03d}.csv", csv_buffer.getvalue())
-            chunk_index += 1
-
-            if total_fetched >= MAX_ARTICLES:
-                logger.info(f"Download limit reached: {MAX_ARTICLES} articles")
-                break
+    # Store zip in Redis (expires in 1 hour)
+    redis_client.setex(REDIS_KEY, 3600, buffer.getvalue())
 
     logger.info(
-        f"Download complete: {total_fetched} articles in {chunk_index - 1} chunks"
+        f"Download complete: {len(rows)} articles, {images_downloaded} images downloaded, {images_failed} failed"
     )
-    return zip_path
+    return "done"
 
 
 def revoke_task(task_id):

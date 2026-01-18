@@ -4,13 +4,13 @@ import {
   Box,
   Center,
   Text,
-  Loader,
   Paper,
   Stack,
 } from '@mantine/core'
 import { useStore } from '../store'
 import { articlesApi } from '../api'
 import Carousel from './Carousel'
+import { CarouselSkeleton } from './Skeletons'
 
 const CARDS_PER_PAGE = 9
 const MAX_PAGES = 5
@@ -29,14 +29,12 @@ function MainContent() {
   // Track if we're navigating (vs initial load or filter change)
   const isNavigating = useRef(false)
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['articles', filters, pagination],
     queryFn: () =>
       articlesApi.getArticles(filters, pagination, CARDS_PER_PAGE * MAX_PAGES),
     enabled: !!filters.dateStart && !!filters.dateEnd,
   })
-
-  const { setCurrentSlide } = useStore()
 
   // Track when pagination changes (navigation)
   useEffect(() => {
@@ -88,17 +86,9 @@ function MainContent() {
       setLastSeen(data.last_seen)
     }
 
-    // Position carousel based on navigation direction
-    if (pagination.lastSeenDate) {
-      if (pagination.direction === 'forward') {
-        setCurrentSlide(0) // Start of new batch
-      } else {
-        setCurrentSlide(MAX_PAGES - 1) // End of previous batch
-      }
-    }
     isNavigating.current = false
     lastProcessedData.current = data
-  }, [data, pagination.direction, pagination.lastSeenDate, setArticles, setTotalCount, setLastSeen, setCurrentSlide, resetPagination])
+  }, [data, pagination.direction, pagination.lastSeenDate, setArticles, setTotalCount, setLastSeen, resetPagination])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -108,24 +98,39 @@ function MainContent() {
     return () => clearInterval(interval)
   }, [refetch])
 
-  // if (!filters.dateStart || !filters.dateEnd) {
-  //   return (
-  //     <Center h={400}>
-  //       <Loader color="red" size="lg" />
-  //     </Center>
-  //   )
-  // }
-
-  // if (isLoading) {
-  //   return (
-  //     <Center h={400}>
-  //       <Loader color="red" size="lg" />
-  //     </Center>
-  //   )
-  // }
-
   // Use stored articles if current data is empty (boundary case)
   const displayArticles = data?.articles?.length ? data.articles : storedArticles
+
+  // Show error state
+  if (error) {
+    return (
+      <Center h={400}>
+        <Paper p="xl" withBorder radius="md" bg="red.0">
+          <Stack align="center" gap="xs">
+            <Text size="lg" fw={500} c="red.8">
+              Error
+            </Text>
+            <Text c="red.6">
+              Something went wrong. Please try again.
+            </Text>
+          </Stack>
+        </Paper>
+      </Center>
+    )
+  }
+
+  // Show skeleton only on initial load (when no data exists yet)
+  if (isLoading && (!storedArticles || storedArticles.length === 0)) {
+    return (
+      <Box
+        p="lg"
+        h="100%"
+        style={{ borderRadius: 'var(--mantine-radius-md)' }}
+      >
+        <CarouselSkeleton />
+      </Box>
+    )
+  }
 
   if (!displayArticles || displayArticles.length === 0) {
     return (

@@ -39,7 +39,7 @@ export const useStore = create<AppState>((set) => ({
     dateStart: null,
     dateEnd: null,
     query: null,
-    hasImage: false,
+    hasImage: true,
     descOrder: true,
     groupBy: 'month',
   },

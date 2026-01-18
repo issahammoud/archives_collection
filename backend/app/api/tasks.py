@@ -162,16 +162,20 @@ async def get_download_status(task_id: str):
 
 @router.get("/download/file")
 async def download_file():
-    """Download the generated data file."""
-    import os
+    """Download the generated data file from Redis."""
+    import redis
+    from fastapi.responses import Response
 
-    zip_path = f"{settings.IMAGES_PATH}/data.zip"
+    REDIS_KEY = "download:data.zip"
+    redis_client = redis.from_url(settings.REDIS_URL)
 
-    if not os.path.exists(zip_path):
+    zip_data = redis_client.get(REDIS_KEY)
+
+    if not zip_data:
         raise HTTPException(status_code=404, detail="File not found")
 
-    return FileResponse(
-        path=zip_path,
+    return Response(
+        content=zip_data,
         media_type="application/zip",
-        filename="data.zip",
+        headers={"Content-Disposition": "attachment; filename=data.zip"},
     )

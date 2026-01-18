@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Card, Image, Text, Box, Tooltip } from '@mantine/core'
+import { Card, Text, Box, Tooltip, Skeleton } from '@mantine/core'
 import { LazyLoadImage } from 'react-lazy-load-image-component'
-import 'react-lazy-load-image-component/src/effects/blur.css' // The blur effect styles
+import 'react-lazy-load-image-component/src/effects/blur.css'
 import type { Article } from '../types'
 
 interface ArticlePreviewCardProps {
@@ -12,6 +12,7 @@ interface ArticlePreviewCardProps {
 
 function ArticlePreviewCard({ article, isSelected, onClick }: ArticlePreviewCardProps) {
   const [imageError, setImageError] = useState(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
 
   const imageUrl =
     article.image_url && !imageError
@@ -39,25 +40,28 @@ function ArticlePreviewCard({ article, isSelected, onClick }: ArticlePreviewCard
       }}
     >
       <Card.Section>
-        <LazyLoadImage
+        <div style={{ height: 80, width: '100%', position: 'relative' }}>
+          {!imageLoaded && (
+            <Skeleton height={80} radius={0} style={{ position: 'absolute', top: 0, left: 0, right: 0 }} />
+          )}
+          <LazyLoadImage
             src={imageUrl}
             alt={article.title || 'Article image'}
             height={80}
             width="100%"
-            effect="blur" // Adds the smooth fade-in
+            effect="blur"
             onError={() => setImageError(true)}
-            
-            // Manual styling to match Mantine's 'fit="cover"'
-            style={{ 
-              objectFit: 'cover', 
-              width: '100%', 
+            afterLoad={() => setImageLoaded(true)}
+            style={{
+              objectFit: 'cover',
+              width: '100%',
+              opacity: imageLoaded ? 1 : 0,
             }}
-            
-            // Ensures the library's wrapper span also fills the space
             wrapperProps={{
-                style: { width: '100%', height: '100%', display: 'block' }
+              style: { width: '100%', height: '100%', display: 'block' }
             }}
           />
+        </div>
       </Card.Section>
 
       <Box mt="xs">

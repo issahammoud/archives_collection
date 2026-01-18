@@ -76,6 +76,10 @@ function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
   const scrollPrev = useCallback(() => {
     if (pageIndex === 0 && lastSeen?.backward) {
       // At first page, fetch previous batch
+      // Set position immediately to last page (where we'll land)
+      setPageIndex(4)
+      setCurrentSlide(4)
+      setSelectedCardIndex(0)
       setPagination({
         direction: 'backward',
         lastSeenDate: lastSeen.backward.date,
@@ -92,6 +96,10 @@ function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
   const scrollNext = useCallback(() => {
     if (pageIndex === totalPages - 1 && lastSeen?.forward) {
       // At last page, fetch next batch
+      // Set position immediately to first page (where we'll land)
+      setPageIndex(0)
+      setCurrentSlide(0)
+      setSelectedCardIndex(0)
       setPagination({
         direction: 'forward',
         lastSeenDate: lastSeen.forward.date,
