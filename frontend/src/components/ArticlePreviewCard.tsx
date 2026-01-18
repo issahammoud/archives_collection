@@ -10,9 +10,20 @@ interface ArticlePreviewCardProps {
   onClick: () => void
 }
 
+// Helper to safely convert value to string
+const safeString = (value: unknown): string | null => {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'string') return value
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
 function ArticlePreviewCard({ article, isSelected, onClick }: ArticlePreviewCardProps) {
   const [imageError, setImageError] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
+
+  // Safely extract string values to prevent rendering objects
+  const title = safeString(article.title)
 
   const imageUrl =
     article.image_url && !imageError
@@ -46,7 +57,7 @@ function ArticlePreviewCard({ article, isSelected, onClick }: ArticlePreviewCard
           )}
           <LazyLoadImage
             src={imageUrl}
-            alt={article.title || 'Article image'}
+            alt={title || 'Article image'}
             height={80}
             width="100%"
             effect="blur"
@@ -65,9 +76,9 @@ function ArticlePreviewCard({ article, isSelected, onClick }: ArticlePreviewCard
       </Card.Section>
 
       <Box mt="xs">
-        <Tooltip label={article.title || 'Untitled'} withArrow position="top" mb="1px" multiline w={220}>
+        <Tooltip label={title || 'Untitled'} withArrow position="top" mb="1px" multiline w={220}>
           <Text size="xs" fw={300} lineClamp={2} c="inky-navy.6" lh={1.3}>
-            {article.title || 'Untitled'}
+            {title || 'Untitled'}
           </Text>
         </Tooltip>
       </Box>

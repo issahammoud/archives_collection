@@ -152,14 +152,14 @@ function StatsPanel() {
         {/* Line Chart */}
         {isLoadingGroupBy ? (
           <LineChartSkeleton />
-        ) : groupByData ? (
+        ) : groupByData?.data && Array.isArray(groupByData.data) && groupByData.data.length > 0 ? (
           <ArticlesLineChart data={groupByData.data} reversed={!filters.descOrder} />
         ) : null}
 
         {/* Pie Chart */}
         {isLoadingArchiveCounts ? (
           <PieChartSkeleton />
-        ) : archiveCountsData ? (
+        ) : archiveCountsData?.data && Array.isArray(archiveCountsData.data) && archiveCountsData.data.length > 0 ? (
           <ArchivePieChart data={archiveCountsData.data} />
         ) : null}
       </Stack>

@@ -24,23 +24,36 @@ const COLORS = [
 ]
 
 function ArchivePieChart({ data }: ArchivePieChartProps) {
+  // Early return if data is not a valid array
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    return null
+  }
+
   const chartData = useMemo(() => {
-    const total = data.reduce((sum, item) => sum + item.count, 0)
+    // Defensive check inside useMemo as well
+    if (!Array.isArray(data) || data.length === 0) return []
+
+    const total = data.reduce((sum, item) => sum + (typeof item.count === 'number' ? item.count : 0), 0)
 
     // Separate items >= 1% and < 1%
     const significantItems: { name: string; value: number; color: string }[] = []
     let otherValue = 0
 
+    // Avoid division by zero
+    if (total === 0) return []
+
     data.forEach((item, index) => {
-      const percentage = (item.count / total) * 100
+      const count = typeof item.count === 'number' ? item.count : 0
+      const percentage = (count / total) * 100
       if (percentage >= 1) {
+        const archiveName = typeof item.archive === 'string' ? item.archive : String(item.archive || '')
         significantItems.push({
-          name: item.archive.charAt(0).toUpperCase() + item.archive.slice(1),
-          value: item.count,
+          name: archiveName.charAt(0).toUpperCase() + archiveName.slice(1),
+          value: count,
           color: COLORS[index % COLORS.length],
         })
       } else {
-        otherValue += item.count
+        otherValue += count
       }
     })
 
@@ -65,6 +78,7 @@ function ArchivePieChart({ data }: ArchivePieChartProps) {
 
   // Create data with custom labels that include name and percentage
   const chartDataWithLabels = useMemo(() => {
+    if (total === 0) return []
     return chartData.map((item) => {
       const percentage = ((item.value / total) * 100).toFixed(0)
       return {
@@ -85,11 +99,11 @@ function ArchivePieChart({ data }: ArchivePieChartProps) {
         valueFormatter={(value) => {
           // Find the item to get its custom label
           const item = chartDataWithLabels.find((d) => d.value === value)
-          if (item) {
+          if (item && total > 0) {
             const percentage = ((value / total) * 100).toFixed(0)
             return `${item.name} ${percentage}%`
           }
-          return value.toLocaleString()
+          return typeof value === 'number' ? value.toLocaleString() : String(value)
         }}
         withTooltip
         tooltipDataSource="segment"
@@ -99,7 +113,9 @@ function ArchivePieChart({ data }: ArchivePieChartProps) {
             if (!payload || payload.length === 0) return null
             const item = payload[0]?.payload
             if (!item) return null
-            const percentage = ((item.value / total) * 100).toFixed(1)
+            const percentage = total > 0 ? ((item.value / total) * 100).toFixed(1) : '0'
+            const itemName = typeof item.name === 'string' ? item.name : String(item.name || '')
+            const itemValue = typeof item.value === 'number' ? item.value : 0
             return (
               <Box
                 p="xs"
@@ -111,10 +127,10 @@ function ArchivePieChart({ data }: ArchivePieChartProps) {
                 }}
               >
                 <Text size="xs" fw={500} style={{ color: item.color }}>
-                  {item.name}
+                  {itemName}
                 </Text>
                 <Text size="xs" c="white">
-                  {item.value.toLocaleString()} articles ({percentage}%)
+                  {itemValue.toLocaleString()} articles ({percentage}%)
                 </Text>
               </Box>
             )

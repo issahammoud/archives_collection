@@ -21,21 +21,35 @@ interface ArticleCardProps {
   article: Article
 }
 
+// Helper to safely convert value to string
+const safeString = (value: unknown): string | null => {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'string') return value
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
 function ArticleCard({ article }: ArticleCardProps) {
   const [imageError, setImageError] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
+
+  // Safely extract string values to prevent rendering objects
+  const title = safeString(article.title)
+  const content = safeString(article.content)
+  const archive = safeString(article.archive)
+  const tagValue = safeString(article.tag)
 
   const formattedDate = article.date
     ? dayjs(article.date).format('MMMM, DD YYYY')
     : ''
 
-  const archiveName = article.archive
-    ? article.archive.charAt(0).toUpperCase() + article.archive.slice(1)
+  const archiveName = archive
+    ? archive.charAt(0).toUpperCase() + archive.slice(1)
     : ''
 
-  const tag = article.tag
-    ? article.tag.trim().charAt(0).toUpperCase() +
-      article.tag.trim().slice(1).toLowerCase()
+  const tag = tagValue
+    ? tagValue.trim().charAt(0).toUpperCase() +
+      tagValue.trim().slice(1).toLowerCase()
     : 'None'
 
   // Determine URL: Use fallback if error occurred or url is missing
@@ -76,7 +90,7 @@ function ArticleCard({ article }: ArticleCardProps) {
           )}
           <LazyLoadImage
             src={imageUrl}
-            alt={article.title || 'Article image'}
+            alt={title || 'Article image'}
             height={180}
             width="100%"
             effect="blur"
@@ -101,9 +115,9 @@ function ArticleCard({ article }: ArticleCardProps) {
           <Text size="xs" c="dimmed">{formattedDate}</Text>
         </Group>
 
-        <Tooltip label={article.title || 'Untitled'} withArrow position="top" mb="1px">
-          <Text fw={600} size="md" lineClamp={1} c="inky-navy.6" title={article.title || ''}>
-            {article.title || 'Untitled'}
+        <Tooltip label={title || 'Untitled'} withArrow position="top" mb="1px">
+          <Text fw={600} size="md" lineClamp={1} c="inky-navy.6" title={title || ''}>
+            {title || 'Untitled'}
           </Text>
         </Tooltip>
 
@@ -119,7 +133,7 @@ function ArticleCard({ article }: ArticleCardProps) {
         >
         <ScrollArea h={90} offsetScrollbars scrollbarSize={6}>
           <Text size="sm" c="inky-dark" lh={1.6} ta="justify">
-            {article.content || "No content available"}
+            {content || "No content available"}
           </Text>
         </ScrollArea>
       </Blockquote>

@@ -10,7 +10,15 @@ interface ArticlesLineChartProps {
 }
 
 function ArticlesLineChart({ data, reversed = false }: ArticlesLineChartProps) {
+  // Early return if data is not a valid array
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    return null
+  }
+
   const chartData = useMemo(() => {
+    // Defensive check inside useMemo as well
+    if (!Array.isArray(data)) return []
+
     const sorted = [...data].sort((a, b) => {
       const dateA = new Date(a.date).getTime()
       const dateB = new Date(b.date).getTime()
@@ -19,7 +27,7 @@ function ArticlesLineChart({ data, reversed = false }: ArticlesLineChartProps) {
 
     return sorted.map((item) => ({
       date: item.date ? dayjs(item.date).format('MMM YY') : '',
-      count: item.count,
+      count: typeof item.count === 'number' ? item.count : 0,
     }))
   }, [data, reversed])
 
@@ -61,6 +69,9 @@ function ArticlesLineChart({ data, reversed = false }: ArticlesLineChartProps) {
           content: ({ payload, coordinate }) => {
             if (!payload || payload.length === 0) return null
             const item = payload[0]
+            if (!item) return null
+            const dateValue = typeof item.payload?.date === 'string' ? item.payload.date : String(item.payload?.date || '')
+            const countValue = typeof item.value === 'number' ? item.value : 0
             return (
               <Box
                 p="xs"
@@ -74,15 +85,15 @@ function ArticlesLineChart({ data, reversed = false }: ArticlesLineChartProps) {
                   boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
                 }}
               >
-                <div style={{ fontWeight: 500 }}>{item.payload?.date}</div>
+                <div style={{ fontWeight: 500 }}>{dateValue}</div>
                 <div style={{ color: 'var(--mantine-color-inky-red-4)' }}>
-                  {item.value?.toLocaleString()} articles
+                  {countValue.toLocaleString()} articles
                 </div>
               </Box>
             )
           },
         }}
-        valueFormatter={(value) => value.toLocaleString()}
+        valueFormatter={(value) => typeof value === 'number' ? value.toLocaleString() : String(value)}
       />
     </Box>
   )
