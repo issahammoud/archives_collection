@@ -3,6 +3,7 @@ export interface Article {
   date: string
   archive: string
   image: string | null
+  image_url: string | null  // Presigned S3 URL for direct access
   title: string | null
   content: string | null
   tag: string | null

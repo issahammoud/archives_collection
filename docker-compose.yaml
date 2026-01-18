@@ -4,26 +4,24 @@ services:
     build:
       context: backend/
       dockerfile: Dockerfile
-      args:
-        HOST_UID: "${UID}"
-        HOST_GID: "${GID}"
     env_file:
       - .env
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - EMBED_URL=http://embedding:8000/v1/embeddings
       - DATABASE_HOST=pgbouncer
       - DATABASE_PORT=5432
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_REGION=${S3_REGION}
     depends_on:
       db:
         condition: service_started
       redis:
         condition: service_started
-      embedding:
-        condition: service_healthy
     volumes:
       - ./backend/:/backend
-      - ~/archives_collection_images:/images
 
   backend:
     <<: *backend_base
@@ -52,12 +50,11 @@ services:
       - VITE_API_URL=http://backend:8000
 
   db:
-    image: pgvector/pgvector:pg17
+    image: postgres:17
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      HNSW_EF_SEARCH: ${HNSW_EF_SEARCH}
     command: >
       postgres
       -c shared_buffers=6GB
@@ -76,6 +73,8 @@ services:
       -c min_wal_size=1GB
       -c log_min_duration_statement=4000
     shm_size: 4gb
+    ports:
+      - "5432:5432"
     deploy:
       resources:
         limits:
@@ -84,7 +83,6 @@ services:
           memory: 4GB
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
     restart: unless-stopped
 
   pgbouncer:
@@ -106,48 +104,9 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7.4.2
+    image: redis:7.4.2-alpine
     ports:
       - "6379:6379"
 
-  embedding:
-    build:
-      context: embedding/
-      dockerfile: Dockerfile
-      args:
-        BASE_IMAGE: ${BASE_IMAGE}
-        EMBEDDING_MODE: ${EMBEDDING_MODE}
-        torch_cuda_arch_list: ""
-    env_file:
-      - .env.local
-    ports:
-      - "8001:8000"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    volumes:
-      - ./embedding/:/embedding
-      - hf_cache:/root/.cache/huggingface
-
-  precommit:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: precommit_container
-    volumes:
-      - .:/workspace
-      - .git:/workspace/.git
-    working_dir: /workspace
-
 volumes:
   postgres_data:
-  hf_cache:

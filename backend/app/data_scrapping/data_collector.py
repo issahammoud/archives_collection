@@ -1,7 +1,5 @@
 import re
-import os
 import logging
-import hashlib
 import dateparser
 import pandas as pd
 import requests
@@ -10,81 +8,19 @@ import numpy as np
 from bs4 import BeautifulSoup
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, date
-from wand.image import Image as WandImage
 
 from app.core.config import settings
 from app.core.enums import DBCOLUMNS
 from app.core.sync_db import SyncDBManager
+from app.core.utils import save_image, get_image_path
 from app.data_scrapping.strategy import StrategyFactory
 
 logger = logging.getLogger(__name__)
 db_manager = SyncDBManager()
 
 
-def save_image(file_path, image_bytes, quality=80):
-    if image_bytes is not None:
-        try:
-            with WandImage(blob=image_bytes) as img:
-                img.quality = quality
-                img.format = "webp"
-                img.save(filename=file_path)
-        except Exception:
-            with open(file_path, "wb") as file:
-                file.write(image_bytes)
-        finally:
-            return file_path
-    return None
-
-
-def get_image_path(data_dir, date, section_url):
-    hash_url = hashlib.sha256(section_url.encode("utf-8")).hexdigest()
-    try:
-        year = date.year
-        month = date.month
-    except Exception:
-        year = "unknown"
-        month = "unknown"
-
-    subdir = os.path.join(data_dir, str(year), str(month))
-    os.makedirs(subdir, exist_ok=True)
-    file_name = f"{hash_url}.webp"
-    file_path = os.path.join(subdir, file_name)
-    return file_path
-
-
-def get_embeddings(batch, embedding_url, timeout=20):
-    data = []
-    for el in batch:
-        text = ""
-        text += (
-            f"title: {el.get(DBCOLUMNS.title, '')}\n" if el.get(DBCOLUMNS.title) else ""
-        )
-        text += (
-            f"content: {el.get(DBCOLUMNS.content, '')}\n"
-            if el.get(DBCOLUMNS.content)
-            else ""
-        )
-        text += f"topic: {el.get(DBCOLUMNS.tag, '')}" if el.get(DBCOLUMNS.tag) else ""
-        data.append(text)
-
-    payload = {"data": data}
-
-    try:
-        resp = requests.post(embedding_url, json=payload, timeout=timeout)
-        resp.raise_for_status()
-        data = orjson.loads(resp.content)
-        embeddings = np.array(data["embeddings"])
-        if np.any(embeddings == None):
-            return None
-        return embeddings
-
-    except Exception as e:
-        logger.error(f"Error fetching embeddings for batch of size {len(batch)}: {e}")
-        return None
-
-
 class DataCollector(ABC):
-    BATCH_EMBEDDING = 32
+    BATCH_SIZE = 32
 
     def __init__(self, url_format, date2str, begin_date, end_date, timeout):
         super().__init__()
@@ -96,8 +32,6 @@ class DataCollector(ABC):
         self.timeout = timeout
         self._translation_table = str.maketrans("éàèùâêîôûç", "eaeuaeiouc")
         self._fetch_strategy = StrategyFactory(self)
-        self._data_dir = "/images/"
-        self._embedding_url = settings.EMBED_URL
 
     def match_format(self, url):
         return bool(
@@ -152,8 +86,8 @@ class DataCollector(ABC):
 
                         data[DBCOLUMNS.date] = date
                         data[DBCOLUMNS.link] = section_url
-                        img_path = get_image_path(self._data_dir, date, section_url)
-                        img_path = save_image(img_path, data[DBCOLUMNS.image])
+                        s3_key = get_image_path(date, section_url)
+                        img_path = save_image(s3_key, data[DBCOLUMNS.image])
                         data[DBCOLUMNS.image] = img_path
                         data_list.append(data)
 
@@ -177,19 +111,7 @@ class DataCollector(ABC):
             logger.debug(e)
 
     def insert_batch(self, data_list):
-        list_ = []
-        embeddings = get_embeddings(data_list, self._embedding_url)
-        if embeddings is not None:
-            for data, emb in zip(data_list, embeddings):
-                data[DBCOLUMNS.embedding] = (
-                    emb.tolist() if hasattr(emb, "tolist") else emb
-                )
-                list_.append(data)
-
-            rowscount = db_manager.insert_rows("articles", list_)
-        else:
-            rowscount = db_manager.insert_rows("articles", data_list)
-
+        rowscount = db_manager.insert_rows("articles", data_list)
         logger.info(f"{rowscount} were inserted into the database")
 
     @abstractmethod

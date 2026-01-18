@@ -46,7 +46,9 @@ def download_task(columns, filters, order):
     from sqlalchemy import MetaData, Table, select, inspect, text, func, tuple_
 
     chunk_index = 1
-    CHUNK_SIZE = 100_000
+    CHUNK_SIZE = 10_000
+    MAX_ARTICLES = 100_000  # Total limit to prevent server RAM overload
+    total_fetched = 0
     zip_path = f"{settings.IMAGES_PATH}/data.zip"
 
     if os.path.exists(zip_path):
@@ -66,7 +68,11 @@ def download_task(columns, filters, order):
     with zipfile.ZipFile(zip_path, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         last_seen = None
 
-        while True:
+        while total_fetched < MAX_ARTICLES:
+            # Calculate remaining articles to fetch
+            remaining = MAX_ARTICLES - total_fetched
+            current_limit = min(CHUNK_SIZE, remaining)
+
             with engine.connect() as conn:
                 with conn.begin():
                     conn.execute(
@@ -108,12 +114,14 @@ def download_task(columns, filters, order):
                             table_ref.c.date.asc(), table_ref.c.rowid.asc()
                         )
 
-                    query = query.limit(CHUNK_SIZE)
+                    query = query.limit(current_limit)
                     result = conn.execute(query)
                     rows = result.fetchall()
 
             if not rows:
                 break
+
+            total_fetched += len(rows)
 
             last_seen = {
                 DBCOLUMNS.date: (
@@ -130,6 +138,13 @@ def download_task(columns, filters, order):
             zf.writestr(f"data_chunk_{chunk_index:03d}.csv", csv_buffer.getvalue())
             chunk_index += 1
 
+            if total_fetched >= MAX_ARTICLES:
+                logger.info(f"Download limit reached: {MAX_ARTICLES} articles")
+                break
+
+    logger.info(
+        f"Download complete: {total_fetched} articles in {chunk_index - 1} chunks"
+    )
     return zip_path
 
 

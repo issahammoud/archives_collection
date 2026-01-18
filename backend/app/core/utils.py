@@ -1,4 +1,4 @@
-import os
+import io
 import re
 import base64
 import hashlib
@@ -10,20 +10,49 @@ from wand.image import Image as WandImage
 
 from app.core.config import settings
 from app.core.enums import DBCOLUMNS
+from app.core.s3_client import sync_s3_client, async_s3_client
 
 logger = logging.getLogger(__name__)
 
 
-def resize_image_for_html(img_path: str, target_height: int = 300) -> str | None:
-    """Resize image and return base64 encoded string for HTML display."""
+def resize_image_from_bytes(
+    image_bytes: bytes, target_height: int = 300
+) -> bytes | None:
+    """Resize image bytes and return resized bytes."""
     try:
-        with WandImage(filename=img_path) as img:
+        with WandImage(blob=image_bytes) as img:
             aspect_ratio = img.width / img.height
             new_width = int(target_height * aspect_ratio)
             img.resize(new_width, target_height)
-            resized_image_bytes = img.make_blob(format="webp")
+            return img.make_blob(format="webp")
+    except Exception as e:
+        logger.error(f"Error resizing image: {e}")
+        return None
 
-        encoded_image = base64.b64encode(resized_image_bytes).decode()
+
+def resize_image_for_html(
+    image_data: str | bytes, target_height: int = 300
+) -> str | None:
+    """Resize image and return base64 encoded string for HTML display.
+
+    Args:
+        image_data: Either an S3 key (str) or raw image bytes
+        target_height: Target height for the resized image
+    """
+    try:
+        if isinstance(image_data, str):
+            # It's an S3 key, download the image
+            image_bytes = sync_s3_client.download_image(image_data)
+            if image_bytes is None:
+                return None
+        else:
+            image_bytes = image_data
+
+        resized_bytes = resize_image_from_bytes(image_bytes, target_height)
+        if resized_bytes is None:
+            return None
+
+        encoded_image = base64.b64encode(resized_bytes).decode()
         return f"data:image/webp;base64,{encoded_image}"
 
     except Exception as e:
@@ -31,24 +60,90 @@ def resize_image_for_html(img_path: str, target_height: int = 300) -> str | None
         return None
 
 
-def save_image(file_path: str, image_bytes: bytes, quality: int = 80) -> str | None:
-    """Save image bytes to file path."""
-    if image_bytes is not None:
-        try:
-            with WandImage(blob=image_bytes) as img:
-                img.quality = quality
-                img.format = "webp"
-                img.save(filename=file_path)
-        except Exception:
-            with open(file_path, "wb") as file:
-                file.write(image_bytes)
-        finally:
-            return file_path
+async def resize_image_for_html_async(
+    s3_key: str, target_height: int = 300
+) -> str | None:
+    """Async version: Resize image from S3 and return base64 encoded string."""
+    try:
+        image_bytes = await async_s3_client.download_image(s3_key)
+        if image_bytes is None:
+            return None
+
+        resized_bytes = resize_image_from_bytes(image_bytes, target_height)
+        if resized_bytes is None:
+            return None
+
+        encoded_image = base64.b64encode(resized_bytes).decode()
+        return f"data:image/webp;base64,{encoded_image}"
+
+    except Exception as e:
+        logger.error(f"Error processing image: {e}")
+        return None
+
+
+def process_image_to_webp(image_bytes: bytes, quality: int = 80) -> bytes | None:
+    """Process image bytes to webp format."""
+    if image_bytes is None:
+        return None
+    try:
+        with WandImage(blob=image_bytes) as img:
+            img.quality = quality
+            img.format = "webp"
+            return img.make_blob()
+    except Exception as e:
+        logger.error(f"Error converting image to webp: {e}")
+        return image_bytes  # Return original if conversion fails
+
+
+def save_image(s3_key: str, image_bytes: bytes, quality: int = 80) -> str | None:
+    """Process and upload image to S3.
+
+    Args:
+        s3_key: The S3 key (path) where the image will be stored
+        image_bytes: Raw image bytes to process and upload
+        quality: WebP quality setting (0-100)
+
+    Returns:
+        The S3 key if successful, None otherwise
+    """
+    if image_bytes is None:
+        return None
+
+    processed_bytes = process_image_to_webp(image_bytes, quality)
+    if processed_bytes is None:
+        return None
+
+    if sync_s3_client.upload_image(s3_key, processed_bytes):
+        return s3_key
     return None
 
 
-def get_image_path(data_dir: str, date, section_url: str) -> str:
-    """Generate image file path based on date and URL hash."""
+async def save_image_async(
+    s3_key: str, image_bytes: bytes, quality: int = 80
+) -> str | None:
+    """Async version: Process and upload image to S3."""
+    if image_bytes is None:
+        return None
+
+    processed_bytes = process_image_to_webp(image_bytes, quality)
+    if processed_bytes is None:
+        return None
+
+    if await async_s3_client.upload_image(s3_key, processed_bytes):
+        return s3_key
+    return None
+
+
+def get_image_path(date, section_url: str) -> str:
+    """Generate S3 key for image based on date and URL hash.
+
+    Args:
+        date: Date object with year and month attributes
+        section_url: URL to hash for unique filename
+
+    Returns:
+        S3 key in format: {year}/{month}/{hash}.webp
+    """
     hash_url = hashlib.sha256(section_url.encode("utf-8")).hexdigest()
     try:
         year = date.year
@@ -57,11 +152,7 @@ def get_image_path(data_dir: str, date, section_url: str) -> str:
         year = "unknown"
         month = "unknown"
 
-    subdir = os.path.join(data_dir, str(year), str(month))
-    os.makedirs(subdir, exist_ok=True)
-    file_name = f"{hash_url}.webp"
-    file_path = os.path.join(subdir, file_name)
-    return file_path
+    return f"{year}/{month}/{hash_url}.webp"
 
 
 def convert_count_to_str(count: int) -> str:

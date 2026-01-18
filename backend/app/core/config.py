@@ -24,8 +24,15 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     PROJECT_NAME: str = "Archives Collection"
 
-    # Images path
+    # Images path (legacy, for migration)
     IMAGES_PATH: str = "/images"
+
+    # S3 Configuration
+    S3_ENDPOINT_URL: str = os.getenv("S3_ENDPOINT_URL", "")
+    S3_ACCESS_KEY: str = os.getenv("S3_ACCESS_KEY", "")
+    S3_SECRET_KEY: str = os.getenv("S3_SECRET_KEY", "")
+    S3_BUCKET_NAME: str = os.getenv("S3_BUCKET_NAME", "archives-images")
+    S3_REGION: str = os.getenv("S3_REGION", "gra")
 
     @property
     def async_database_url(self) -> str:

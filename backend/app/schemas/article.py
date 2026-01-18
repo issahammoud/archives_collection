@@ -14,11 +14,12 @@ class ArticleBase(BaseModel):
 
 
 class ArticleCreate(ArticleBase):
-    embedding: Optional[List[float]] = None
+    pass
 
 
 class ArticleResponse(ArticleBase):
     rowid: int
+    image_url: Optional[str] = None  # Presigned S3 URL for direct access
 
     class Config:
         from_attributes = True

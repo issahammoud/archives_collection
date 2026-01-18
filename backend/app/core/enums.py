@@ -24,7 +24,6 @@ class DBCOLUMNS(str, Enum):
     tag = "tag"
     link = "link"
     hash = "hash"
-    embedding = "embedding"
     text_searchable = "text_searchable"
 
 
@@ -39,7 +38,6 @@ class OPERATORS(str, Enum):
     isnull = "isnull"
     notnull = "notnull"
     ts = "text_search"
-    vs = "vector_search"
 
 
 class CeleryTasks(str, Enum):

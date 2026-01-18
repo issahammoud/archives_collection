@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Card,
-  Image,
+  // Image, // Removed Mantine Image
   Text,
   Group,
   Stack,
@@ -12,9 +12,10 @@ import {
   Blockquote,
 } from '@mantine/core'
 import { IconQuoteFilled } from '@tabler/icons-react'
+import { LazyLoadImage } from 'react-lazy-load-image-component'
+import 'react-lazy-load-image-component/src/effects/blur.css' // The blur effect styles
 import dayjs from 'dayjs'
 import type { Article } from '../types'
-import { imagesApi } from '../api'
 
 interface ArticleCardProps {
   article: Article
@@ -36,9 +37,10 @@ function ArticleCard({ article }: ArticleCardProps) {
       article.tag.trim().slice(1).toLowerCase()
     : 'None'
 
+  // Determine URL: Use fallback if error occurred or url is missing
   const imageUrl =
-    article.image && !imageError
-      ? imagesApi.getImageUrl(article.image)
+    article.image_url && !imageError
+      ? article.image_url
       : 'https://placehold.co/600x400?text=Placeholder'
 
   return (
@@ -57,27 +59,41 @@ function ArticleCard({ article }: ArticleCardProps) {
         color: 'inherit',
         display: 'flex',
         flexDirection: 'column',
-        // transition: 'transform 150ms ease, box-shadow 150ms ease',
       }}
       styles={{
         root: {
           '&:hover': {
-            // transform: 'scale(1.02)',
             boxShadow: 'var(--mantine-shadow-lg)',
           },
         },
       }}
     >
-      
       <Card.Section>
-        <Image
-          src={imageUrl}
-          alt={article.title || 'Article image'}
-          h={180}
-          fit="cover"
-          fallbackSrc="https://placehold.co/600x400?text=Placeholder"
-          onError={() => setImageError(true)}
-        />
+        {/* Wrapper div is critical here: 
+           It reserves the 180px height immediately so the layout doesn't shift 
+        */}
+        <div style={{ height: 180, width: '100%', overflow: 'hidden', backgroundColor: '#f1f3f5' }}>
+          <LazyLoadImage
+            src={imageUrl}
+            alt={article.title || 'Article image'}
+            height={180}
+            width="100%"
+            effect="blur" // Adds the smooth fade-in
+            onError={() => setImageError(true)}
+            
+            // Manual styling to match Mantine's 'fit="cover"'
+            style={{ 
+              objectFit: 'cover', 
+              width: '100%', 
+              height: '100%' 
+            }}
+            
+            // Ensures the library's wrapper span also fills the space
+            wrapperProps={{
+                style: { width: '100%', height: '100%', display: 'block' }
+            }}
+          />
+        </div>
       </Card.Section>
 
       <Stack gap="xs" mt="md" style={{ flex: 1 }}>

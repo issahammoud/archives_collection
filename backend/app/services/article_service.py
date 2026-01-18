@@ -174,7 +174,11 @@ class ArticleService:
                         "rowid": row.rowid,
                         "date": row.date.isoformat() if row.date else None,
                         "archive": row.archive,
-                        "image": row.image,
+                        "image": (
+                            row.image.replace("/images/", "")
+                            if isinstance(row.image, str)
+                            else row.image
+                        ),
                         "title": row.title,
                         "content": row.content,
                         "tag": row.tag,

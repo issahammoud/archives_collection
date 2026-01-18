@@ -6,7 +6,6 @@ from fastapi.responses import FileResponse
 
 from app.core.config import settings
 from app.core.enums import DBCOLUMNS, OPERATORS, CeleryTasks
-from app.core.utils import get_query_embedding_sync
 from app.tasks.celery_tasks import collection_task, download_task, revoke_task
 from app.schemas import (
     TaskResponse,
@@ -109,9 +108,6 @@ async def start_download(
 
         if query:
             filters[DBCOLUMNS.text_searchable] = [(OPERATORS.ts, query)]
-            embedding = get_query_embedding_sync(query)
-            if embedding:
-                filters[DBCOLUMNS.embedding] = [(OPERATORS.vs, embedding)]
 
         if has_image:
             filters[DBCOLUMNS.image] = [(OPERATORS.notnull, None)]

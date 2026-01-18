@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_async_session
 from app.core.enums import DBCOLUMNS, OPERATORS, Archives
-from app.core.utils import get_query_embedding_async
+from app.core.s3_client import sync_s3_client
 from app.services.article_service import ArticleService
 from app.schemas import (
     ArticleListResponse,
@@ -30,7 +30,6 @@ def build_filters(
     date_end: Optional[date] = None,
     query: Optional[str] = None,
     has_image: Optional[bool] = None,
-    embedding: Optional[List[float]] = None,
 ) -> dict:
     """Build filter dictionary from parameters."""
     filters = {}
@@ -50,8 +49,6 @@ def build_filters(
 
     if query:
         filters[DBCOLUMNS.text_searchable] = [(OPERATORS.ts, query)]
-        if embedding:
-            filters[DBCOLUMNS.embedding] = [(OPERATORS.vs, embedding)]
 
     if has_image:
         filters[DBCOLUMNS.image] = [(OPERATORS.notnull, None)]
@@ -76,10 +73,6 @@ async def get_articles(
 ):
     """Fetch articles with filters and pagination."""
     try:
-        embedding = None
-        if query:
-            embedding = await get_query_embedding_async(query)
-
         filters = build_filters(
             archives=archives,
             tag=tag,
@@ -87,7 +80,6 @@ async def get_articles(
             date_end=date_end,
             query=query,
             has_image=has_image,
-            embedding=embedding,
         )
 
         service = ArticleService(session)
@@ -118,8 +110,19 @@ async def get_articles(
                 },
             }
 
+        # Generate presigned URLs for images (direct S3 access for better UX)
+        # Using sync client since presigned URL generation is a local operation
+        articles_with_urls = []
+        for article in articles:
+            image_url = None
+            if article.get("image"):
+                image_url = sync_s3_client.get_presigned_url(
+                    article["image"], expires_in=3600
+                )
+            articles_with_urls.append(ArticleResponse(**article, image_url=image_url))
+
         return ArticleListResponse(
-            articles=[ArticleResponse(**a) for a in articles],
+            articles=articles_with_urls,
             total_count=total_count,
             last_seen=last_seen,
         )
@@ -140,10 +143,6 @@ async def get_article_count(
 ):
     """Get total article count with filters."""
     try:
-        embedding = None
-        if query:
-            embedding = await get_query_embedding_async(query)
-
         filters = build_filters(
             archives=archives,
             tag=tag,
@@ -151,7 +150,6 @@ async def get_article_count(
             date_end=date_end,
             query=query,
             has_image=has_image,
-            embedding=embedding,
         )
 
         service = ArticleService(session)
@@ -176,10 +174,6 @@ async def get_grouped_articles(
 ):
     """Get articles grouped by day, month, or year."""
     try:
-        embedding = None
-        if query:
-            embedding = await get_query_embedding_async(query)
-
         filters = build_filters(
             archives=archives,
             tag=tag,
@@ -187,7 +181,6 @@ async def get_grouped_articles(
             date_end=date_end,
             query=query,
             has_image=has_image,
-            embedding=embedding,
         )
 
         service = ArticleService(session)
@@ -247,10 +240,6 @@ async def get_archive_counts(
 ):
     """Get article counts per archive with filters."""
     try:
-        embedding = None
-        if query:
-            embedding = await get_query_embedding_async(query)
-
         filters = build_filters(
             archives=archives,
             tag=tag,
@@ -258,7 +247,6 @@ async def get_archive_counts(
             date_end=date_end,
             query=query,
             has_image=has_image,
-            embedding=embedding,
         )
 
         service = ArticleService(session)

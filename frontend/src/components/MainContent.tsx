@@ -108,21 +108,21 @@ function MainContent() {
     return () => clearInterval(interval)
   }, [refetch])
 
-  if (!filters.dateStart || !filters.dateEnd) {
-    return (
-      <Center h={400}>
-        <Loader color="red" size="lg" />
-      </Center>
-    )
-  }
+  // if (!filters.dateStart || !filters.dateEnd) {
+  //   return (
+  //     <Center h={400}>
+  //       <Loader color="red" size="lg" />
+  //     </Center>
+  //   )
+  // }
 
-  if (isLoading) {
-    return (
-      <Center h={400}>
-        <Loader color="red" size="lg" />
-      </Center>
-    )
-  }
+  // if (isLoading) {
+  //   return (
+  //     <Center h={400}>
+  //       <Loader color="red" size="lg" />
+  //     </Center>
+  //   )
+  // }
 
   // Use stored articles if current data is empty (boundary case)
   const displayArticles = data?.articles?.length ? data.articles : storedArticles

@@ -8,7 +8,6 @@ from sqlalchemy import (
     Index,
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR
-from pgvector.sqlalchemy import HALFVEC
 
 from app.core.database import Base
 
@@ -30,7 +29,6 @@ class Article(Base):
         nullable=False,
         unique=True,
     )
-    embedding = Column(HALFVEC(1024), nullable=True)
     text_searchable = Column(TSVECTOR, nullable=True)
 
     __table_args__ = (
