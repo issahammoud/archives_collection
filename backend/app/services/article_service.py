@@ -43,7 +43,7 @@ class ArticleService:
                 elif column == DBCOLUMNS.text_searchable:
                     if operator == OPERATORS.ts:
                         # Full-text search using to_tsquery
-                        ts_query = func.plainto_tsquery("french", func.unaccent(value))
+                        ts_query = func.websearch_to_tsquery("french", func.unaccent(value))
                         query = query.where(Article.text_searchable.op("@@")(ts_query))
 
         return query
@@ -84,7 +84,7 @@ class ArticleService:
                 elif column == DBCOLUMNS.text_searchable:
                     if operator == OPERATORS.ts:
                         clauses.append(
-                            f"text_searchable @@ plainto_tsquery('french', unaccent(:query_{param_idx}))"
+                            f"text_searchable @@ websearch_to_tsquery('french', unaccent(:query_{param_idx}))"
                         )
                         params[f"query_{param_idx}"] = value
                 param_idx += 1

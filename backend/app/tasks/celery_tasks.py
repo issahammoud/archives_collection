@@ -89,7 +89,7 @@ def download_task(columns, filters, order):
                     elif op_str == "in":
                         query = query.where(col.in_(value))
                     elif op_str == "text_search":
-                        ts_query = func.plainto_tsquery("french", func.unaccent(value))
+                        ts_query = func.websearch_to_tsquery("french", func.unaccent(value))
                         query = query.where(col.op("@@")(ts_query))
                     elif op_str == "notnull":
                         query = query.where(col.isnot(None))
