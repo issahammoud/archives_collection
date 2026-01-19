@@ -65,7 +65,7 @@ function ArticleCard({ article }: ArticleCardProps) {
       target="_blank"
       rel="noopener noreferrer"
       shadow="sm"
-      padding="lg"
+      // padding="lg"
       radius="md"
       withBorder
       h="100%"

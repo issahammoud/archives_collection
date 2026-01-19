@@ -1,11 +1,13 @@
 import { useState, useCallback } from 'react'
 import { Box, TextInput } from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
 import { IconSearch } from '@tabler/icons-react'
 import { useStore } from '../store'
 
 function SearchBar() {
   const { filters, setFilters, resetPagination } = useStore()
   const [searchQuery, setSearchQuery] = useState(filters.query || '')
+  const isMobile = useMediaQuery('(max-width: 768px)')
 
   const handleSearch = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -18,9 +20,9 @@ function SearchBar() {
   )
 
   return (
-    <Box w="60%" mx="auto" my="lg">
+    <Box w={isMobile ? '100%' : '60%'} mx="auto" my={isMobile ? 'md' : 'lg'}>
       <TextInput
-        placeholder="Search articles by text..."
+        placeholder="Search articles, for example Ukraine War"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         onKeyDown={handleSearch}

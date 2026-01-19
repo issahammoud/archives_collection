@@ -80,11 +80,6 @@ export const articlesApi = {
     return data
   },
 
-  getTags: async (): Promise<TagsResponse> => {
-    const { data } = await api.get<TagsResponse>('/articles/tags')
-    return data
-  },
-
   getDateRange: async (): Promise<DateRangeResponse> => {
     const { data } = await api.get<DateRangeResponse>('/articles/date-range')
     return data

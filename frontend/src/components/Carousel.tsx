@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect } from 'react'
-import { Box, Group, ActionIcon, SimpleGrid } from '@mantine/core'
+import { Box, Group, ActionIcon, SimpleGrid, ScrollArea } from '@mantine/core'
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
 import type { Article } from '../types'
 import { useStore } from '../store'
@@ -11,11 +11,12 @@ interface CarouselProps {
   articles: Article[]
   slidesPerPage: number
   maxPages: number
+  isMobile?: boolean
 }
 
-const CARDS_PER_PAGE = 9
+const DESKTOP_CARDS_PER_PAGE = 9
 
-function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
+function Carousel({ articles, slidesPerPage, maxPages, isMobile = false }: CarouselProps) {
   const {
     lastSeen,
     setPagination,
@@ -23,10 +24,13 @@ function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
     setCurrentSlide,
   } = useStore()
 
-  // Group articles into pages of 6
+  // For mobile: 1 article per page, for desktop: 9 articles per page
+  const cardsPerPage = isMobile ? 1 : DESKTOP_CARDS_PER_PAGE
+
+  // Group articles into pages
   const pages: Article[][] = []
-  for (let i = 0; i < articles.length; i += CARDS_PER_PAGE) {
-    pages.push(articles.slice(i, i + CARDS_PER_PAGE))
+  for (let i = 0; i < articles.length; i += cardsPerPage) {
+    pages.push(articles.slice(i, i + cardsPerPage))
   }
   const totalPages = pages.length
 
@@ -73,12 +77,15 @@ function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
   const canScrollPrev = pageIndex > 0 || !!lastSeen?.backward
   const canScrollNext = pageIndex < totalPages - 1 || !!lastSeen?.forward
 
+  // Calculate which page to land on when fetching previous batch
+  const lastPageIndex = isMobile ? 19 : 4 // 20 pages for mobile (0-19), 5 pages for desktop (0-4)
+
   const scrollPrev = useCallback(() => {
     if (pageIndex === 0 && lastSeen?.backward) {
       // At first page, fetch previous batch
       // Set position immediately to last page (where we'll land)
-      setPageIndex(4)
-      setCurrentSlide(4)
+      setPageIndex(lastPageIndex)
+      setCurrentSlide(lastPageIndex)
       setSelectedCardIndex(0)
       setPagination({
         direction: 'backward',
@@ -91,7 +98,7 @@ function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
       setCurrentSlide(newIndex)
       setSelectedCardIndex(0)
     }
-  }, [pageIndex, lastSeen, setPagination, setCurrentSlide])
+  }, [pageIndex, lastSeen, setPagination, setCurrentSlide, lastPageIndex])
 
   const scrollNext = useCallback(() => {
     if (pageIndex === totalPages - 1 && lastSeen?.forward) {
@@ -119,10 +126,105 @@ function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
     setSelectedCardIndex(0)
   }, [setCurrentSlide])
 
-  if (!selectedArticle) {
+  // For mobile, the current article is just the first (and only) article on the page
+  const currentArticle = isMobile ? currentPageArticles[0] : selectedArticle
+
+  if (!currentArticle) {
     return null
   }
 
+  // Mobile Layout
+  if (isMobile) {
+    return (
+      <Box pos="relative" pb="xl">
+        {/* Navigation buttons - positioned outside the card */}
+        {canScrollPrev && (
+          <ActionIcon
+            variant="filled"
+            color="inky-red.4"
+            radius="xl"
+            size="md"
+            onClick={scrollPrev}
+            pos="absolute"
+            left={10}
+            top="40%"
+            style={{
+              transform: 'translateX(-100%) translateY(-50%)',
+              zIndex: 10,
+            }}
+          >
+            <IconChevronLeft size={16} />
+          </ActionIcon>
+        )}
+
+        {canScrollNext && (
+          <ActionIcon
+            variant="filled"
+            color="inky-red.4"
+            radius="xl"
+            size="md"
+            onClick={scrollNext}
+            pos="absolute"
+            right={10}
+            top="40%"
+            style={{
+              transform: 'translateX(100%) translateY(-50%)',
+              zIndex: 10,
+            }}
+          >
+            <IconChevronRight size={16} />
+          </ActionIcon>
+        )}
+
+        {/* Single Article Card - same width as stats panel */}
+        <Box
+          bg="gray"
+          style={{ borderRadius: 'var(--mantine-radius-md)' }}
+        >
+          <ArticleCard article={currentArticle} />
+        </Box>
+
+        {/* Page indicator dots - scrollable for mobile */}
+        <ScrollArea
+          type="never"
+          style={{
+            marginTop: 16,
+          }}
+        >
+          <Group
+            justify="center"
+            gap={4}
+            wrap="nowrap"
+            style={{
+              minWidth: 'max-content',
+              padding: '0 16px',
+            }}
+          >
+            {Array.from({ length: totalPages }).map((_, index) => (
+              <Box
+                key={index}
+                onClick={() => goToPage(index)}
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  backgroundColor:
+                    index === pageIndex
+                      ? 'var(--mantine-color-inky-red-4)'
+                      : 'var(--mantine-color-gray-3)',
+                  cursor: 'pointer',
+                  transition: 'background-color 150ms ease',
+                  flexShrink: 0,
+                }}
+              />
+            ))}
+          </Group>
+        </ScrollArea>
+      </Box>
+    )
+  }
+
+  // Desktop Layout
   return (
     <Box
       pos="relative"
@@ -150,7 +252,7 @@ function Carousel({ articles, slidesPerPage, maxPages }: CarouselProps) {
               height: '100%',
             }}
           >
-            <ArticleCard article={selectedArticle} />
+            <ArticleCard article={currentArticle} />
           </Box>
         </Grid.Col>
       </Grid>

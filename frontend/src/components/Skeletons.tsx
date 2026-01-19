@@ -65,8 +65,45 @@ export function ArticleCardSkeleton() {
   )
 }
 
-// Skeleton for the entire carousel (9 preview cards + 1 large card)
-export function CarouselSkeleton() {
+// Skeleton for the entire carousel (9 preview cards + 1 large card) - Desktop
+export function CarouselSkeleton({ isMobile = false }: { isMobile?: boolean }) {
+  // Mobile skeleton - single card with 20 dots
+  if (isMobile) {
+    return (
+      <Box pos="relative" pb="xl">
+        <Box
+          bg="white"
+          p="xs"
+          style={{ borderRadius: 'var(--mantine-radius-md)' }}
+        >
+          <ArticleCardSkeleton />
+        </Box>
+
+        {/* Page indicator dots skeleton - 20 dots for mobile */}
+        <Group
+          justify="center"
+          gap={4}
+          wrap="nowrap"
+          mt="md"
+        >
+          {Array.from({ length: 20 }).map((_, index) => (
+            <Box
+              key={index}
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                backgroundColor: 'var(--mantine-color-gray-3)',
+                flexShrink: 0,
+              }}
+            />
+          ))}
+        </Group>
+      </Box>
+    )
+  }
+
+  // Desktop skeleton - 9 preview cards + 1 large card
   return (
     <Box pos="relative">
       <Grid gutter="xl" align="stretch">

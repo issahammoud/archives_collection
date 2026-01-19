@@ -12,10 +12,21 @@ import { articlesApi } from '../api'
 import Carousel from './Carousel'
 import { CarouselSkeleton } from './Skeletons'
 
-const CARDS_PER_PAGE = 9
-const MAX_PAGES = 5
+// Desktop: 9 cards per page, 5 pages = 45 articles
+const DESKTOP_CARDS_PER_PAGE = 9
+const DESKTOP_MAX_PAGES = 5
 
-function MainContent() {
+// Mobile: 1 card per page, 20 pages = 20 articles
+const MOBILE_CARDS_PER_PAGE = 1
+const MOBILE_MAX_PAGES = 20
+
+interface MainContentProps {
+  isMobile?: boolean
+}
+
+function MainContent({ isMobile = false }: MainContentProps) {
+  const CARDS_PER_PAGE = isMobile ? MOBILE_CARDS_PER_PAGE : DESKTOP_CARDS_PER_PAGE
+  const MAX_PAGES = isMobile ? MOBILE_MAX_PAGES : DESKTOP_MAX_PAGES
   const {
     filters,
     pagination,
@@ -120,8 +131,8 @@ function MainContent() {
 
   if (isLoading && (!storedArticles || storedArticles.length === 0)) {
     return (
-      <Box p="lg" h="100%" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
-        <CarouselSkeleton />
+      <Box p={isMobile ? 0 : 'lg'} h="100%" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
+        <CarouselSkeleton isMobile={isMobile} />
       </Box>
     )
   }
@@ -140,11 +151,12 @@ function MainContent() {
   }
 
   return (
-    <Box p="lg" h="100%" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
+    <Box p={isMobile ? 0 : 'lg'} h="100%" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
       <Carousel
         articles={displayArticles}
         slidesPerPage={CARDS_PER_PAGE}
         maxPages={MAX_PAGES}
+        isMobile={isMobile}
       />
     </Box>
   )

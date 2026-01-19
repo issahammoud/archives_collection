@@ -19,7 +19,11 @@ import ArchivePieChart from './ArchivePieChart'
 import { LineChartSkeleton, PieChartSkeleton } from './Skeletons'
 import dayjs from 'dayjs'
 
-function StatsPanel() {
+interface StatsPanelProps {
+  isMobile?: boolean
+}
+
+function StatsPanel({ isMobile = false }: StatsPanelProps) {
   const { filters, totalCount, setFilters, resetPagination } = useStore()
 
   const isDateRangeComplete = !!filters.dateStart && !!filters.dateEnd
@@ -36,11 +40,6 @@ function StatsPanel() {
     queryFn: () => articlesApi.getArchiveCounts(filters),
     enabled: isDateRangeComplete,
     placeholderData: (prev) => prev, // Keep previous data while selecting date range
-  })
-
-  const { data: tagsData } = useQuery({
-    queryKey: ['tags'],
-    queryFn: articlesApi.getTags,
   })
 
   const { data: archivesData } = useQuery({
@@ -62,27 +61,27 @@ function StatsPanel() {
   return (
     <Box
       bg="white"
-      p="md"
+      p={isMobile ? 'xs' : 'md'}
       h="100%"
       style={{ borderRadius: 'var(--mantine-radius-md)' }}
     >
-      <Stack gap={24} justify="space-between">
-        {/* Article Count and Filters Row - All 4 elements in one row */}
-        <Group gap="xs" align="center" justify="space-around">
+      <Stack gap={isMobile ? 12 : 24} justify="space-between">
+        {/* Article Count and Filters Row - All elements in one row */}
+        <Group gap={isMobile ? 4 : 'xs'} align="center" justify={isMobile ? 'space-between' : 'space-around'} wrap="nowrap">
           {totalCount === 0 ? (
-            <Skeleton height={32} width={70} radius="xl" />
+            <Skeleton height={isMobile ? 28 : 32} width={isMobile ? 50 : 70} radius="xl" />
           ) : (
             <Tooltip label={`${totalCount.toLocaleString()} articles`} withArrow position="bottom">
               <Badge
-                size="xl"
+                size={isMobile ? 'md' : 'xl'}
                 variant="filled"
                 color="inky-red.5"
                 radius="xl"
-                px="xl"
+                px={isMobile ? 'sm' : 'xl'}
                 styles={{
                   root: {
                     textTransform: 'none',
-                    fontSize: '0.9rem',
+                    fontSize: isMobile ? '0.75rem' : '0.9rem',
                   },
                 }}
               >
@@ -96,12 +95,12 @@ function StatsPanel() {
             <Popover.Target>
               <Tooltip label="Filter by archive" withArrow position="bottom">
                 <ActionIcon
-                  variant= {filters.archives.length > 0 ? 'outline' : 'subtle'}
+                  variant={filters.archives.length > 0 ? 'outline' : 'subtle'}
                   color="inky-red-5"
-                  size="md"
+                  size={isMobile ? 'sm' : 'md'}
                   radius="md"
                 >
-                  <IconBook size={16} />
+                  <IconBook size={isMobile ? 14 : 16} />
                 </ActionIcon>
               </Tooltip>
             </Popover.Target>
@@ -127,7 +126,7 @@ function StatsPanel() {
 
           <DatePickerInput
             type="range"
-            placeholder="Select date range"
+            placeholder={isMobile ? 'Date range' : 'Select date range'}
             value={[
               filters.dateStart ? dayjs(filters.dateStart).toDate() : null,
               filters.dateEnd ? dayjs(filters.dateEnd).toDate() : null,
@@ -141,11 +140,12 @@ function StatsPanel() {
             }}
             minDate={dateRange?.min_date ? dayjs(dateRange.min_date).toDate() : undefined}
             maxDate={dateRange?.max_date ? dayjs(dateRange.max_date).toDate() : undefined}
-            valueFormat="DD/MM/YYYY"
+            valueFormat={isMobile ? 'DD/MM/YY' : 'DD/MM/YYYY'}
             variant="filled"
             radius="md"
             size="xs"
             clearable={false}
+            style={{ flex: isMobile ? 1 : undefined, maxWidth: isMobile ? 180 : undefined }}
           />
         </Group>
 
@@ -156,12 +156,14 @@ function StatsPanel() {
           <ArticlesLineChart data={groupByData.data} reversed={!filters.descOrder} />
         ) : null}
 
-        {/* Pie Chart */}
-        {isLoadingArchiveCounts ? (
-          <PieChartSkeleton />
-        ) : archiveCountsData?.data && Array.isArray(archiveCountsData.data) && archiveCountsData.data.length > 0 ? (
-          <ArchivePieChart data={archiveCountsData.data} />
-        ) : null}
+        {/* Pie Chart - Hidden on mobile */}
+        {!isMobile && (
+          isLoadingArchiveCounts ? (
+            <PieChartSkeleton />
+          ) : archiveCountsData?.data && Array.isArray(archiveCountsData.data) && archiveCountsData.data.length > 0 ? (
+            <ArchivePieChart data={archiveCountsData.data} />
+          ) : null
+        )}
       </Stack>
     </Box>
   )
