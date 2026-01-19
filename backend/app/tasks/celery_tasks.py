@@ -48,7 +48,7 @@ def download_task(columns, filters, order):
     from sqlalchemy import MetaData, Table, select, inspect
     from app.core.s3_client import sync_s3_client
 
-    MAX_ARTICLES = 1000  # Limit to 1000 rows for download with images
+    MAX_ARTICLES = 500  # Limit to 500 rows for download with images
     REDIS_KEY = "download:data.zip"
 
     # Connect to Redis
