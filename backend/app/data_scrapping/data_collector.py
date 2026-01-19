@@ -20,7 +20,7 @@ db_manager = SyncDBManager()
 
 
 class DataCollector(ABC):
-    BATCH_SIZE = 32
+    BATCH_SIZE = 100
 
     def __init__(self, url_format, date2str, begin_date, end_date, timeout):
         super().__init__()
@@ -91,14 +91,14 @@ class DataCollector(ABC):
                         data[DBCOLUMNS.image] = img_path
                         data_list.append(data)
 
-                        if len(data_list) >= DataCollector.BATCH_EMBEDDING:
+                        if len(data_list) >= DataCollector.BATCH_SIZE:
                             self.insert_batch(data_list)
                             data_list = []
 
                 except Exception as e:
                     logger.debug(f"Exception in parsing section from page {url}")
                     logger.debug(e)
-                    if len(data_list) >= DataCollector.BATCH_EMBEDDING:
+                    if len(data_list) >= DataCollector.BATCH_SIZE:
                         self.insert_batch(data_list)
                         data_list = []
 
