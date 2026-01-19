@@ -151,7 +151,7 @@ function MainContent({ isMobile = false }: MainContentProps) {
   }
 
   return (
-    <Box p={isMobile ? 0 : 'lg'} h="100%" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
+    <Box p={isMobile ? '0' : 'lg'} h="100%" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
       <Carousel
         articles={displayArticles}
         slidesPerPage={CARDS_PER_PAGE}

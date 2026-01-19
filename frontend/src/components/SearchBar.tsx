@@ -20,9 +20,9 @@ function SearchBar() {
   )
 
   return (
-    <Box w={isMobile ? '100%' : '60%'} mx="auto" my={isMobile ? 'md' : 'lg'}>
+    <Box w={isMobile ? '100%' : '60%'} mx="auto" my={isMobile ? 'md' : 'lg'} p={isMobile ? '0' : 'lg'}>
       <TextInput
-        placeholder="Search articles, for example Ukraine War"
+        placeholder={isMobile ? 'Ukraine War, Gaza Genocide, etc.' : 'Search for articles, for instance Gaza Genocide'}
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         onKeyDown={handleSearch}

@@ -61,7 +61,7 @@ function StatsPanel({ isMobile = false }: StatsPanelProps) {
   return (
     <Box
       bg="white"
-      p={isMobile ? 'xs' : 'md'}
+      p={isMobile ? 'md' : 'lg'}
       h="100%"
       style={{ borderRadius: 'var(--mantine-radius-md)' }}
     >

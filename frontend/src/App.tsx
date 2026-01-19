@@ -36,17 +36,11 @@ function App() {
 
       <AppShell.Main
         bg="#f9fafb"
-        // style={{
-        //   minHeight: 'calc(100vh - var(--app-shell-header-height, 0px))',
-        //   display: 'flex',
-        //   flexDirection: 'column',
-        //   paddingBottom: 0,
-        // }}
       >
         <Box style={{ flex: 1 }}>
           {isMobile ? (
             // Mobile Layout
-            <Stack gap="md" px="xs">
+            <Stack gap="md" p="lg">
               <SearchBar />
               <StatsPanel isMobile />
               <MainContent isMobile />
