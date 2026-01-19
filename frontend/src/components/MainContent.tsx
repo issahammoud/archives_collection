@@ -106,13 +106,7 @@ function MainContent({ isMobile = false }: MainContentProps) {
     // unless the underlying DATA has actually changed via the API.
   }, [data, setArticles, setTotalCount, setLastSeen, resetPagination, pagination.direction])
 
-  // Periodic Refetch
-  useEffect(() => {
-    const interval = setInterval(() => {
-      refetch()
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [refetch])
+
 
   const displayArticles = data?.articles?.length ? data.articles : storedArticles
 
