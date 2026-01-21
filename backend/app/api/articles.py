@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_async_session
 from app.core.enums import DBCOLUMNS, OPERATORS, Archives
 from app.core.s3_client import sync_s3_client
+from app.core.utils import translator
 from app.services.article_service import ArticleService
 from app.schemas import (
     ArticleListResponse,
@@ -48,6 +49,7 @@ def build_filters(
         filters[DBCOLUMNS.archive] = [(OPERATORS.in_, archives)]
 
     if query:
+        query = translator.to_french(query)
         filters[DBCOLUMNS.text_searchable] = [(OPERATORS.ts, query)]
 
     if has_image:

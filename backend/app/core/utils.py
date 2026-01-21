@@ -1,4 +1,3 @@
-import io
 import re
 import base64
 import hashlib
@@ -6,7 +5,10 @@ import logging
 import httpx
 import orjson
 import numpy as np
+from functools import lru_cache
 from wand.image import Image as WandImage
+from google.oauth2 import service_account
+from google.cloud import translate_v2 as translate
 
 from app.core.config import settings
 from app.core.enums import DBCOLUMNS
@@ -272,3 +274,29 @@ def get_query_embedding_sync(query: str, timeout: int = 20) -> list | None:
     except Exception as e:
         logger.error(f"Error fetching embeddings for query {query}: {e}")
         return None
+
+
+class SearchTranslator:
+    def __init__(self):
+        if settings.GOOGLE_CREDENTIALS_JSON:
+            # Create credentials from the dictionary in settings
+            creds = service_account.Credentials.from_service_account_info(
+                settings.GOOGLE_CREDENTIALS_JSON
+            )
+            self.client = translate.Client(credentials=creds)
+        else:
+            self.client = translate.Client()
+
+    @lru_cache(maxsize=1000)
+    def to_french(self, text: str) -> str:
+        if not text or len(text.strip()) < 2:
+            return text
+        try:
+            result = self.client.translate(text, target_language='fr', format_='text')
+            return result['translatedText']
+        except Exception as e:
+            # Log error and return original text as fallback
+            logger.error(f"Translation API error: {e}")
+            return text
+        
+translator = SearchTranslator()

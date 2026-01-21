@@ -6,7 +6,6 @@ from sqlalchemy import select, func, text, tuple_, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.article import Article
-from app.core.config import settings
 from app.core.enums import DBCOLUMNS, OPERATORS
 
 logger = logging.getLogger(__name__)

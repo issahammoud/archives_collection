@@ -1,38 +1,51 @@
-import os
 from functools import lru_cache
-from pydantic_settings import BaseSettings
+from typing import Optional, Dict, Any
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # Database
-    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
-    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "postgres")
-    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "archives")
-    DATABASE_HOST: str = os.getenv("DATABASE_HOST", "pgbouncer")
-    DATABASE_PORT: int = int(os.getenv("DATABASE_PORT", "5432"))
+    # --- Database ---
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_DB: str = "archives"
+    DATABASE_HOST: str = "pgbouncer"
+    DATABASE_PORT: int = 5432
 
-    # Redis
-    REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
+    # --- Redis ---
+    REDIS_URL: str = "redis://redis:6379/0"
 
-    # Embedding service
-    EMBED_URL: str = os.getenv("EMBED_URL", "http://embedding:8000/v1/embeddings")
+    # --- Embedding service (Jina v4 / Google) ---
+    EMBED_URL: str = "http://embedding:8000/v1/embeddings"
+    JINA_API_KEY: Optional[str] = None
+    
+    # --- Google Translation ---
+    # Path to your JSON file
+    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
+    # OR: The full JSON content (handy for Docker/production)
+    GOOGLE_CREDENTIALS_JSON: Optional[str] = None
 
-    # HNSW
-    HNSW_EF_SEARCH: int = int(os.getenv("HNSW_EF_SEARCH", "100"))
+    # --- HNSW ---
+    HNSW_EF_SEARCH: int = 100
 
-    # API settings
+    # --- API settings ---
     API_V1_PREFIX: str = "/api/v1"
     PROJECT_NAME: str = "Archives Collection"
 
-    # Images path (legacy, for migration)
+    # --- Storage ---
     IMAGES_PATH: str = "/images"
+    S3_ENDPOINT_URL: str = ""
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+    S3_BUCKET_NAME: str = "archives-images"
+    S3_REGION: str = "gra"
 
-    # S3 Configuration
-    S3_ENDPOINT_URL: str = os.getenv("S3_ENDPOINT_URL", "")
-    S3_ACCESS_KEY: str = os.getenv("S3_ACCESS_KEY", "")
-    S3_SECRET_KEY: str = os.getenv("S3_SECRET_KEY", "")
-    S3_BUCKET_NAME: str = os.getenv("S3_BUCKET_NAME", "archives-images")
-    S3_REGION: str = os.getenv("S3_REGION", "gra")
+    GOOGLE_CREDENTIALS_JSON: Optional[Dict[str, Any]] = None
+
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        extra="ignore", 
+        case_sensitive=True
+    )
 
     @property
     def async_database_url(self) -> str:
@@ -41,9 +54,6 @@ class Settings(BaseSettings):
     @property
     def sync_database_url(self) -> str:
         return f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.DATABASE_HOST}:{self.DATABASE_PORT}/{self.POSTGRES_DB}"
-
-    class Config:
-        case_sensitive = True
 
 
 @lru_cache()
