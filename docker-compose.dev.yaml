@@ -15,11 +15,14 @@ services:
       - S3_SECRET_KEY=${S3_SECRET_KEY}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
       - S3_REGION=${S3_REGION}
+      - EMBEDING_URL=http://localhost:8001/v1
     depends_on:
       db:
         condition: service_started
       redis:
         condition: service_started
+      embedding:
+        condition: service_healthy
     volumes:
       - ./backend/:/backend
 
@@ -50,7 +53,7 @@ services:
       - VITE_API_URL=http://backend:8000
 
   db:
-    image: postgres:17
+    image: pgvector/pgvector:pg18
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -82,13 +85,56 @@ services:
         reservations:
           memory: 4GB
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     restart: unless-stopped
 
   redis:
     image: redis:7.4.2-alpine
     ports:
       - "6379:6379"
+
+  embedding:
+    image: vllm/vllm-openai:latest
+    entrypoint: ["vllm", "serve"]
+    command:
+      - "jinaai/jina-embeddings-v4-vllm-retrieval"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8000"
+      - "--dtype"
+      - "bfloat16"
+      - "--runner"
+      - "pooling"
+      - "--pooler-config"
+      - '{"pooling_type":"LAST", "normalize":true, "dimensions": 256}'
+      - "--hf-overrides" 
+      - '{"is_matryoshka": true}'
+      - "--max-model-len"
+      - "512"
+      - "--gpu-memory-utilization"
+      - "0.8"
+      - "--quantization"
+      - "bitsandbytes"
+      - "--served-model-name"
+      - "jina"
+    ports:
+      - "8001:8000" # Expose on 8001 to avoid conflict with backend on 8000
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 60s
+      timeout: 300s
+      retries: 5
+      start_period: 120s # Give the vllm server time to start
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
 
 volumes:
   postgres_data:

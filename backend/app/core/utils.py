@@ -4,7 +4,9 @@ import hashlib
 import logging
 import httpx
 import orjson
+import requests
 import numpy as np
+from typing import List, Union
 from functools import lru_cache
 from wand.image import Image as WandImage
 from google.oauth2 import service_account
@@ -274,6 +276,55 @@ def get_query_embedding_sync(query: str, timeout: int = 20) -> list | None:
     except Exception as e:
         logger.error(f"Error fetching embeddings for query {query}: {e}")
         return None
+
+
+class JinaEmbedder:
+    """
+    Client léger utilisant requests pour interagir avec l'API vLLM.
+    Configuré pour récupérer directement les vecteurs de 256 dimensions.
+    """
+
+    def __init__(
+        self, 
+        base_url: str = "http://embedding:8001/v1", 
+        model: str = "jina"
+    ):
+        self.api_url = f"{base_url.rstrip('/')}/embeddings"
+        self.model = model
+        self.headers = {"Content-Type": "application/json"}
+
+    def embed(self, text: Union[str, List[str]]) -> Union[List[float], List[List[float]]]:
+        """
+        Envoie une requête POST à vLLM et retourne les embeddings.
+        """
+        payload = {
+            "model": self.model,
+            "input": [text] if isinstance(text, str) else text,
+            "encoding_format": "float"
+        }
+
+        try:
+            response = requests.post(
+                self.api_url, 
+                headers=self.headers, 
+                json=payload,
+                timeout=30  # Timeout crucial pour les grosses requêtes
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Extraction des vecteurs
+            # La structure vLLM/OpenAI est : {"data": [{"embedding": [...]}, ...]}
+            embeddings = [item["embedding"] for item in data["data"]]
+
+            return embeddings[0] if isinstance(text, str) else embeddings
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Erreur lors de la requête d'embedding : {e}")
+            if response := getattr(e, 'response', None):
+                logger.error(f"Détails de l'erreur : {response.text}")
+            raise
 
 
 class SearchTranslator:

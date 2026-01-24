@@ -79,3 +79,4 @@ frontend/vite.config.d.ts
 .DS_Store
 .vscode/
 *.gz
+*.sql
