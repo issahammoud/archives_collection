@@ -15,6 +15,7 @@ Archives Collection is a Python-based project designed to collect, visualize and
   - [Backend](#backend)
   - [Embedding](#embedding)
   - [Database](#database)
+  - [Search](#search)
 
 
 ## Technologies
@@ -22,11 +23,11 @@ Archives Collection is a Python-based project designed to collect, visualize and
 - **Programming Language:** Python
 - **Data Collection:** Cloudscraper, Beautiful Soup
 - **Containerization:** Docker, Docker Compose, Makefile (for container management)
-- **Front End:** Dash, Dash Mantine Components
-- **Back End:** Dash, Celery, Redis
+- **Front End:** React, Vite
+- **Back End:** FastAPI, Celery, Redis
 - **Database:** PostgreSQL with SQLAlchemy
-- **Search Engine:** tsvector for text search, pgvector for semantic search
-- **Embedding Model**: Jina v3 for textual multilingue embeddings.
+- **Search Engine:** tsvector for keyword search, pgvector for semantic search
+- **Embedding Model:** Jina v3 for multilingual text embeddings
 
 ## Installation
 
@@ -114,29 +115,28 @@ Code and documentation in webapp/src/data_scrapping
 
 ### Frontend
 
-Code in webapp/src/helpers/layout.py and webapp/assets/styles.css
+Code in `frontend/`
 
 - **Carousel**: A carousel showing the collected articles with scrolling capabilities.
 
-- **Navbar**: A navbar containing the control button for filtering and sorting:
+- **Navbar**: A navbar containing controls for filtering and sorting:
   - start collection/stop collection
-  - change order: to inverse the date order (ascending/descending)
+  - change order: invert the date order (ascending/descending)
   - filter image: show/remove articles with empty images (placeholders)
   - group by: show the date grouped per day/month/year
   - Filter by date/topic/text/archive.
 
-
-- **Histogram**: A plotly graph showing the frequency of articles per day/month/year.
+- **Histogram**: A graph showing the frequency of articles per day/month/year.
 
 ### Backend
 
-Code in webapp/src/utils/callbacks.py and webapp/src/utils/celery_tasks.py
+Code in `backend/`
 
-- **Dash Callbacks:**
-  Orchestrate interactions between the front end and backend processes.
+- **FastAPI:**
+  Serves the REST API consumed by the frontend.
 
 - **Celery & Redis:**
-  Manage data collection task asynchronously.
+  Manage data collection tasks asynchronously. Redis also caches semantic search sessions (see [Search](#search)).
 
 ### Embedding
 
@@ -149,36 +149,57 @@ Code in embedding/
   Hosts local embedding models via vLLM, applying an input truncation step before inference.
 
 
-### Database: (src/helpers/db_connector)
-  - Use Postgres and pgvector extension as a vector db.
-  - Fetch data for scrolling using keyset pagination.
-  - Apply filters dynamically to sync with the interface.
+### Database
 
+Code in `backend/`
+
+- PostgreSQL with the pgvector extension.
+- Keyset pagination for efficient scrolling through large result sets.
+- Filters applied dynamically via SQLAlchemy ORM.
 
 **Table:** `articles`
 
-| Column            | Type                              | Constraints / Generation                                                                                                       |
-|-------------------|-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
-| `rowid`           | `BIGINT`                          | Primary Key, auto-increment                                                                                                    |
-| `date`            | `DATE`                            | Not Null                                                                                                                       |
-| `archive`         | `VARCHAR`                         | Not Null                                                                                                                       |
-| `image`           | `TEXT`                            | Nullable                                                                                                                       |
-| `title`           | `VARCHAR`                         | Nullable                                                                                                                       |
-| `content`         | `VARCHAR`                         | Nullable                                                                                                                       |
-| `tag`             | `VARCHAR`                         | Nullable                                                                                                                       |
-| `link`            | `VARCHAR`                         | Not Null                                                                                                                       |
-| `hash`            | `BIGINT`                          | Computed as `hashtext(link)::BIGINT`, persisted; Not Null; Unique                                                              |
-| `embedding`       | `HALFVEC(1024)`           | stores vector embeddings in HALFVEC format                                                                           |
-| `text_searchable` | `TSVECTOR`                        | Generated as `to_tsvector('french', coalesce(title, '') \|\| ' ' \|\| coalesce (content, ''))` |
+| Column            | Type       | Constraints / Generation                                                                             |
+|-------------------|------------|------------------------------------------------------------------------------------------------------|
+| `rowid`           | `BIGINT`   | Primary Key, auto-increment                                                                          |
+| `date`            | `DATE`     | Not Null                                                                                             |
+| `archive`         | `VARCHAR`  | Not Null                                                                                             |
+| `image`           | `TEXT`     | Nullable                                                                                             |
+| `title`           | `VARCHAR`  | Nullable                                                                                             |
+| `content`         | `VARCHAR`  | Nullable                                                                                             |
+| `tag`             | `VARCHAR`  | Nullable                                                                                             |
+| `link`            | `VARCHAR`  | Not Null                                                                                             |
+| `hash`            | `BIGINT`   | Computed as `hashtext(link)::BIGINT`, persisted; Not Null; Unique                                   |
+| `text_searchable` | `TSVECTOR` | Generated as `to_tsvector('french', coalesce(title,'') \|\| ' ' \|\| coalesce(content,''))`        |
 
+**Table:** `article_embeddings`
+
+| Column      | Type            | Constraints                                      |
+|-------------|-----------------|--------------------------------------------------|
+| `rowid`     | `BIGINT`        | Primary Key, FK → `articles.rowid` ON DELETE CASCADE |
+| `embedding` | `HALFVEC(256)`  | Nullable; 16-bit float vector (Jina v3 output)   |
 
 **Indexes**
 
-| Name                    | Columns            | Type   | Options                 |
-|-------------------------|--------------------|--------|-------------------------|
-| `date_rowid_index`      | `date, rowid`      | B-Tree |                         |
-| `text_searchable_index` | `text_searchable`  | GIN    |                         |
-| `embedding_index`       | `embedding`        | HNSW   | `m=32, ef_construction=128` |
+| Name                          | Table                | Columns            | Type   | Options                      |
+|-------------------------------|----------------------|--------------------|--------|------------------------------|
+| `articles_date_rowid_index`   | `articles`           | `date, rowid`      | B-Tree |                              |
+| `articles_text_searchable_idx`| `articles`           | `text_searchable`  | GIN    |                              |
+| `article_embeddings_hnsw_idx` | `article_embeddings` | `embedding`        | HNSW   | `m=16, ef_construction=64, halfvec_ip_ops` |
+
+### Search
+
+The API supports three search modes, selected automatically based on request parameters:
+
+| Mode        | Trigger                          | Strategy                                                                                  |
+|-------------|----------------------------------|-------------------------------------------------------------------------------------------|
+| `SEMANTIC`  | `query` + `min_similarity > 0`   | Vector search via HNSW → all matching IDs cached in Redis → offset-based pagination      |
+| `KEYWORD`   | `query` only                     | tsvector full-text search with keyset pagination                                          |
+| `BROWSE`    | no `query`                       | Direct filter + keyset pagination                                                         |
+
+**Semantic search — Snapshot Pattern:**
+1. First request: embed query → vector search → cache `(article_ids, similarities)` in Redis (15 min TTL) → return page 1 + `search_session_id`
+2. Subsequent pages: pass `search_session_id` + `page` → fetch from cache → DB lookup by IDs (no re-embedding)
 
 
 ---
