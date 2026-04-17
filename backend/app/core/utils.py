@@ -286,7 +286,7 @@ class JinaEmbedder:
 
     def __init__(
         self, 
-        base_url: str = "http://embedding:8001/v1", 
+        base_url: str = "http://embedding:8000/v1", 
         model: str = "jina"
     ):
         self.api_url = f"{base_url.rstrip('/')}/embeddings"
@@ -325,6 +325,39 @@ class JinaEmbedder:
             if response := getattr(e, 'response', None):
                 logger.error(f"Détails de l'erreur : {response.text}")
             raise
+
+    async def embed_async(self, text: Union[str, List[str]]) -> Union[List[float], List[List[float]]]:
+        """Async version: send POST to vLLM and return embeddings."""
+        payload = {
+            "model": self.model,
+            "input": [text] if isinstance(text, str) else text,
+            "encoding_format": "float"
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    self.api_url,
+                    headers=self.headers,
+                    json=payload,
+                    timeout=30
+                )
+                response.raise_for_status()
+
+                data = response.json()
+                embeddings = [item["embedding"] for item in data["data"]]
+
+                return embeddings[0] if isinstance(text, str) else embeddings
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Erreur lors de la requête d'embedding async: {e}")
+            if e.response:
+                logger.error(f"Détails de l'erreur: {e.response.text}")
+            raise
+
+
+# Global embedder instance for query embedding
+query_embedder = JinaEmbedder(base_url=settings.EMBED_URL.rsplit('/embeddings', 1)[0])
 
 
 class SearchTranslator:

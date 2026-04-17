@@ -489,3 +489,138 @@ class TestGroupBy:
 
         with pytest.raises(ValueError, match="must be 'day', 'month', or 'year'"):
             await service.group_by("invalid")
+
+
+class TestFetchArticlesByIds:
+    """Tests for fetch_articles_by_ids method (used in semantic search pagination)."""
+
+    @pytest.mark.asyncio
+    async def test_fetch_by_ids_empty_list(self, async_session: AsyncSession):
+        """Test fetching with empty ID list."""
+        service = ArticleService(async_session)
+        result = await service.fetch_articles_by_ids([])
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_fetch_by_ids_basic(
+        self, async_session: AsyncSession, populated_db: List[dict]
+    ):
+        """Test basic fetch by IDs."""
+        service = ArticleService(async_session)
+        target_ids = [1, 5, 10]
+        result = await service.fetch_articles_by_ids(target_ids)
+
+        assert len(result) == 3
+        returned_ids = {a["rowid"] for a in result}
+        assert returned_ids == {1, 5, 10}
+
+    @pytest.mark.asyncio
+    async def test_fetch_by_ids_order_preserved(
+        self, async_session: AsyncSession, populated_db: List[dict]
+    ):
+        """Test that ID order is preserved in results."""
+        service = ArticleService(async_session)
+        target_ids = [15, 3, 22, 8, 1]
+        result = await service.fetch_articles_by_ids(target_ids, preserve_order=True)
+
+        returned_ids = [a["rowid"] for a in result]
+        assert returned_ids == target_ids
+
+    @pytest.mark.asyncio
+    async def test_fetch_by_ids_pagination(
+        self, async_session: AsyncSession, populated_db: List[dict]
+    ):
+        """Test offset-based pagination."""
+        service = ArticleService(async_session)
+        all_ids = list(range(1, 31))
+
+        # Page 1
+        page1 = await service.fetch_articles_by_ids(all_ids, offset=0, limit=10)
+        assert len(page1) == 10
+        assert [a["rowid"] for a in page1] == list(range(1, 11))
+
+        # Page 2
+        page2 = await service.fetch_articles_by_ids(all_ids, offset=10, limit=10)
+        assert len(page2) == 10
+        assert [a["rowid"] for a in page2] == list(range(11, 21))
+
+    @pytest.mark.asyncio
+    async def test_fetch_by_ids_offset_beyond_results(
+        self, async_session: AsyncSession, populated_db: List[dict]
+    ):
+        """Test offset beyond available results."""
+        service = ArticleService(async_session)
+        result = await service.fetch_articles_by_ids([1, 2, 3], offset=100, limit=10)
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_fetch_by_ids_partial_match(
+        self, async_session: AsyncSession, populated_db: List[dict]
+    ):
+        """Test with some non-existent IDs."""
+        service = ArticleService(async_session)
+        target_ids = [1, 999, 5, 1000]
+        result = await service.fetch_articles_by_ids(target_ids)
+
+        returned_ids = {a["rowid"] for a in result}
+        assert returned_ids == {1, 5}  # Only existing IDs
+
+
+class TestSerializeArticles:
+    """Tests for _serialize_articles helper method."""
+
+    @pytest.mark.asyncio
+    async def test_article_serialization_structure(
+        self, async_session: AsyncSession, populated_db: List[dict]
+    ):
+        """Test that serialized articles have correct structure."""
+        service = ArticleService(async_session)
+        articles = await service.fetch_data_keyset(limit=1)
+
+        assert len(articles) == 1
+        article = articles[0]
+
+        # Verify all expected fields
+        expected_fields = ["rowid", "date", "archive", "image", "title", "content", "tag", "link"]
+        for field in expected_fields:
+            assert field in article, f"Missing field: {field}"
+
+    @pytest.mark.asyncio
+    async def test_date_serialization(
+        self, async_session: AsyncSession, populated_db: List[dict]
+    ):
+        """Test that dates are serialized as ISO strings."""
+        service = ArticleService(async_session)
+        articles = await service.fetch_data_keyset(limit=1)
+
+        article = articles[0]
+        # Date should be ISO format string
+        assert isinstance(article["date"], str)
+        # Should be parseable
+        date.fromisoformat(article["date"])
+
+    @pytest.mark.asyncio
+    async def test_image_path_normalization(
+        self, async_session: AsyncSession, populated_db: List[dict]
+    ):
+        """Test that image paths are normalized (prefix removed)."""
+        service = ArticleService(async_session)
+        articles = await service.fetch_data_keyset(limit=30)
+
+        for article in articles:
+            if article["image"]:
+                # Should not have /images/ prefix
+                assert not article["image"].startswith("/images/")
+
+
+class TestGetCountForIds:
+    """Tests for get_count_for_ids method."""
+
+    @pytest.mark.asyncio
+    async def test_count_returns_list_length(self, async_session: AsyncSession):
+        """Test that count returns the length of the ID list."""
+        service = ArticleService(async_session)
+
+        assert await service.get_count_for_ids([1, 2, 3, 4, 5]) == 5
+        assert await service.get_count_for_ids([]) == 0
+        assert await service.get_count_for_ids(list(range(1000))) == 1000

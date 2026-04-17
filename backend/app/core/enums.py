@@ -25,6 +25,7 @@ class DBCOLUMNS(str, Enum):
     link = "link"
     hash = "hash"
     text_searchable = "text_searchable"
+    embedding = "embedding"
 
 
 class OPERATORS(str, Enum):
@@ -38,6 +39,20 @@ class OPERATORS(str, Enum):
     isnull = "isnull"
     notnull = "notnull"
     ts = "text_search"
+    semantic = "semantic"
+
+
+class SearchMode(str, Enum):
+    """
+    Search mode determines the strategy for fetching articles.
+
+    SEMANTIC: Uses vector embeddings (expensive). Results are cached in Redis.
+    KEYWORD: Uses tsvector full-text search (fast). Direct DB pagination.
+    BROWSE: No search query, just filters (fast). Direct DB pagination.
+    """
+    SEMANTIC = "semantic"
+    KEYWORD = "keyword"
+    BROWSE = "browse"
 
 
 class CeleryTasks(str, Enum):

@@ -80,3 +80,8 @@ frontend/vite.config.d.ts
 .vscode/
 *.gz
 *.sql
+.env
+
+# Tool artefacts
+.codebot*
+.vibe/

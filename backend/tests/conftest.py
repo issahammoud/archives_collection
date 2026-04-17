@@ -16,6 +16,7 @@ from sqlalchemy import (
     Date,
     Text,
     Index,
+    ForeignKey,
 )
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -60,6 +61,16 @@ class Article(TestBase):
         }
 
 
+class ArticleEmbedding(TestBase):
+    """Test-specific ArticleEmbedding model without pgvector types."""
+
+    __tablename__ = "article_embeddings"
+
+    rowid = Column(BigInteger, ForeignKey("articles.rowid"), primary_key=True)
+    # In tests, we don't actually use vector operations, so just store as Text
+    embedding = Column(Text, nullable=True)
+
+
 # Only mock during pytest runs (check if pytest is the main module)
 _is_pytest = "pytest" in sys.modules and hasattr(sys, "_called_from_test")
 
@@ -71,7 +82,14 @@ def pytest_configure(config):
     # Create a mock module for app.models.article BEFORE it gets imported
     _mock_article_module = ModuleType("app.models.article")
     _mock_article_module.Article = Article
+    _mock_article_module.ArticleEmbedding = ArticleEmbedding
     sys.modules["app.models.article"] = _mock_article_module
+
+    # Also mock app.models to use our test models
+    _mock_models_module = ModuleType("app.models")
+    _mock_models_module.Article = Article
+    _mock_models_module.ArticleEmbedding = ArticleEmbedding
+    sys.modules["app.models"] = _mock_models_module
 
 
 def pytest_unconfigure(config):

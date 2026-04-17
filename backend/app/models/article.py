@@ -6,10 +6,15 @@ from sqlalchemy import (
     Text,
     Computed,
     Index,
+    ForeignKey,
 )
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import TSVECTOR
+from pgvector.sqlalchemy import HALFVEC
 
 from app.core.database import Base
+
+EMBEDDING_DIM = 256
 
 
 class Article(Base):
@@ -31,6 +36,9 @@ class Article(Base):
     )
     text_searchable = Column(TSVECTOR, nullable=True)
 
+    # Relationship to embedding
+    embedding_rel = relationship("ArticleEmbedding", back_populates="article", uselist=False)
+
     __table_args__ = (
         Index("articles_date_rowid_index", "date", "rowid"),
         Index(
@@ -39,6 +47,16 @@ class Article(Base):
             postgresql_using="gin",
         ),
     )
+
+
+class ArticleEmbedding(Base):
+    __tablename__ = "article_embeddings"
+
+    rowid = Column(BigInteger, ForeignKey("articles.rowid", ondelete="CASCADE"), primary_key=True)
+    embedding = Column(HALFVEC(EMBEDDING_DIM), nullable=True)
+
+    # Relationship back to article
+    article = relationship("Article", back_populates="embedding_rel")
 
     def __repr__(self):
         return f"<Article(rowid={self.rowid}, title={self.title[:30] if self.title else 'None'}...)>"

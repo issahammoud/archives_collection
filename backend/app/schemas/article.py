@@ -20,6 +20,7 @@ class ArticleCreate(ArticleBase):
 class ArticleResponse(ArticleBase):
     rowid: int
     image_url: Optional[str] = None  # Presigned S3 URL for direct access
+    similarity: Optional[float] = None  # Similarity score (only for semantic search)
 
     class Config:
         from_attributes = True
@@ -29,6 +30,10 @@ class ArticleListResponse(BaseModel):
     articles: List[ArticleResponse]
     total_count: int
     last_seen: Optional[dict] = None
+    has_more: bool = False  # True if more results available (works for both pagination types)
+    # Semantic search session info (only present for semantic search results)
+    search_session_id: Optional[str] = None
+    page: Optional[int] = None  # Current page (1-indexed, only for semantic search)
 
 
 class FilterParams(BaseModel):
